@@ -6,8 +6,18 @@
 #include <sys/socket.h>
 
 
-static const int MAX_NUMBER_OF_SENSOR_NODES = 10;
+// Global Variables
+struct config_s *wsn_config_G;
 
+// Constants
+const char ipv6_addresses_G[2][25] = {
+    {"aaaa::212:4b00:433:edae"},
+    {"aaaa::212:4b00:43c:4be5"}
+};
+
+const int PORT_NUMBER = 207;
+
+// Structure definitions
 typedef struct raw_node_data_s{
     int16_t accel_x;
     int16_t accel_y;
@@ -19,7 +29,6 @@ typedef struct raw_node_data_s{
     unsigned char addr[16]; /* IPv6 address */
 }raw_node_data_t;
 
-
 typedef struct wsn_data_s{
     int combinerID;
     list* llist_wsn;
@@ -29,18 +38,107 @@ typedef struct wsn_data_s{
     float height;    
 }wsn_data_t;
 
+typedef struct wsn_info_s{
+    int number_of_nodes;
+    list *ll_node_info; 
+    //TODO: Determine further parameters
+}wsn_info_t;
+
+typedef struct node_prop_s{
+    char ipv6_address[25];
+    int port;
+    int type;
+    //TODO: see what you can find
+}node_prop_t;
+
+typedef struct wsn_config_s{
+    wsn_info_t *wsn_info;
+    int readout_period;
+    //TODO:  Determine further parameters
+}wsn_config_t;
+
+
+// Private Function Prototypes
+void timestamp(void *p);
+
+
 void * take_sensor_data(void)
 {
     struct wsn_data_s *wsn = NULL;
+    struct node_prop_s *prop = NULL;
 
-    //TODO
-    // Allocate memory for wsn
-    // get number of 
+    // TODO
+    // get number of wsn nodes & correspending addresses
+    // Allocate memory for each node
+    // Go into a for loop 
+    // Timestamp & Geolocate data set
 
+    wsn = (struct wsn_data_s *)malloc(sizeof(struct wsn_data_s *));
+    wsn->llist_wsn = create_list();
+
+    for(int i=0; i < wsn_config_G->wsn_info->number_of_nodes; i++){
+        prop = (struct node_prop_s *)get_node_data_at_index(wsn_config_G->wsn_info->ll_node_info, i);
+
+        prop->ipv6_address, prop->port
+
+
+        
+
+
+static void * get_wsn_info(void)
+{
+    struct wsn_info_s *wsn_info_p = NULL;
+    struct node_prop_s *node_prop_p = NULL;
+    // Get the number of nodes in the system
+    // from the border router
+    // Get the corresponding addresses
+
+
+    wsn_info_p = malloc(sizeof(wsn_info_s));
+    wsn_info_p->number_of_nodes = 2;
+    wsn_info_p->ll_node_prop = create_list();
+
+    // Currently node address are hardcoded
+    for(int i=0; i < wsn_info_p->number_of_nodes; i++){
+        node_prop_p = malloc(sizeof(struct node_prop_s)); 
+        memcpy(node_prop_p->ipv6_address, ipv6_addresses[i], sizeof(char)*25);
+        node_prop_p->type = 2; // 2 is a random choice
+        node_prop_p->port = PORT_NUMBER;
+        push_front( wsn_info_p->ll_node_prop, node_prop_p);
+    }
+
+    return (void *)wsn_info_p;
+    
+}
+
+
+int initiate_wsn(void)
+{
+    //TODO: have the tunslip interface up
+    wsn_config_G = malloc(sizeof(struct config_s));
+    wsn_config_G->readout_period = 5;
+    wsn_config_G->wsn_info = (wns_info_t *)get_wsn_info();
+    return 0;
 
 }
 
-void timestamp(void *p)
+int dismiss_wsn(void)
+{
+    //TODO: have the tunslip interface down
+    empty_list(wsn_config_G->wsn_info->ll_node_prop, free_linked_list_data);
+    free(wsn_config_G->wsn_info);
+    free(wsn_config_G);
+    return 0;
+}
+
+static void free_linked_list_data(void *data)
+{
+    free(data);
+}
+
+
+
+static void timestamp(void *p)
 {
     time_t t;
     struct tm tm;
@@ -124,7 +222,6 @@ void * get_data_from_sensor(char *ip_addr, int port)
         err("recvfrom()");
     }
 
-    void *append_node_id(void *ptr, struct in6_addr *sin6_addr);
 
     append_node_id(raw_buf, &serv_addr.sin6_addr
 
