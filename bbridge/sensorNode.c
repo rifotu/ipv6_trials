@@ -59,17 +59,32 @@ typedef struct wsn_config_s{
 
 
 // Private Function Prototypes
-void timestamp(void *p);
+static void timestamp(void *p);
 
 
-void * take_sensor_data(void)
+static void timestamp(struct wsn_data_s *wsn)
+{
+    time_t t;
+    struct tm tm;
+
+    t = time(NULL);
+    tm = *localtime(&t);
+
+    fprintf(stdout,"now: %d-%d-%d %d:%d:%d\n", tm.tm_year + 1900, tm.tm_mon + 1,
+                                               tm.tm_mday, tm.tm_hour, tm.tm_min,
+                                               tm.tm_sec);
+    wsn->timestamp = tm;
+    return;
+}
+
+void * prep_a_set_of_wsn_data(void)
 {
     struct wsn_data_s *wsn = NULL;
     struct node_prop_s *prop = NULL;
+    void *raw_data;
 
     // TODO
     // get number of wsn nodes & correspending addresses
-    // Allocate memory for each node
     // Go into a for loop 
     // Timestamp & Geolocate data set
 
@@ -78,8 +93,15 @@ void * take_sensor_data(void)
 
     for(int i=0; i < wsn_config_G->wsn_info->number_of_nodes; i++){
         prop = (struct node_prop_s *)get_node_data_at_index(wsn_config_G->wsn_info->ll_node_info, i);
+        raw_data = get_data_from_sensor(prop->ipv6_address, prop->port);
+        push_front(wsn->llist_wsn, raw_data);
+    }
 
-        prop->ipv6_address, prop->port
+    timestamp(wsn);
+    geolocate(
+
+
+}
 
 
         
@@ -134,25 +156,11 @@ int dismiss_wsn(void)
 static void free_linked_list_data(void *data)
 {
     free(data);
-}
-
-
-
-static void timestamp(void *p)
-{
-    time_t t;
-    struct tm tm;
-
-    t = time(NULL);
-    tm = *localtime(&t);
-
-    fprintf(stdout,"now: %d-%d-%d %d:%d:%d\n", tm.tm_year + 1900, tm.tm_mon + 1,
-                                               tm.tm_mday, tm.tm_hour, tm.tm_min,
-                                               tm.tm_sec);
-
-    //TODO: Assign tm
     return;
 }
+
+
+
 
 void * get_mem_for_raw_data(void)
 {
@@ -223,7 +231,7 @@ void * get_data_from_sensor(char *ip_addr, int port)
     }
 
 
-    append_node_id(raw_buf, &serv_addr.sin6_addr
+    append_node_id(raw_buf, &serv_addr.sin6_addr);
 
     print_sensor_payload
     return raw_buf;
