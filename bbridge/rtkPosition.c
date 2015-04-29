@@ -17,7 +17,7 @@ typedef struct llh_s{
 static const int  port = 2137;
 static const char *ip = "127.0.0.1";
 static int rtk_socket_G;
-static llh_t *llh;
+static llh_t *llh_G;
 
 // Private functions
 static int connect_to_rtklib(void)
@@ -25,8 +25,8 @@ static int connect_to_rtklib(void)
 
 int init_rtklib_client(void)
 {
-    llh = malloc(sizeof(struct llh_s));
-    if(NULL == llh){
+    llh_G = malloc(sizeof(struct llh_s));
+    if(NULL == llh_G){
         return -1;
     }
 
@@ -39,8 +39,8 @@ int init_rtklib_client(void)
 
 int dismiss_rtklib_client(void)
 {
-    free(llh);
-    llh = NULL;
+    free(llh_G);
+    llh_G = NULL;
 
     close(rtk_socket_G);
     return 0;
@@ -75,39 +75,38 @@ static int connect_to_rtklib(void)
 
 void * read_frm_RTKlib(void)
 {
-
-    if( 0 > n = read(rtk_socket_G, llh, sizeof(struct llh_s)) ){
+    if( 0 > n = read(rtk_socket_G, llh_G, sizeof(struct llh_s)) ){
         fprintf(stderr, "Error can't read\n");
         return NULL;
     }else{
-        return (void *)llh;
+        return (void *)llh_G;
     }
 }
 
-float get_latitude(void *llh)
+float get_latitude(void)
 {
-    if(NULL == llh){
+    if(NULL == llh_G){
         return -10000;
     }else{
-        return (struct llh_s *)llh->latitude;
+        return (struct llh_s *)llh_G->latitude;
     }
 }
 
-float get_longitude(void *llh)
+float get_longitude(void)
 {
-    if(NULL == llh){
+    if(NULL == llh_G){
         return -10000;
     }else{
-        return (struct llh_s *)llh->longitude;
+        return (struct llh_s *)llh_G->longitude;
     }
 }
 
-float get_height(void *llh)
+float get_height(void)
 {
-    if(NULL == llh){
+    if(NULL == llh_G){
         return -10000;
     }else{
-        return (struct llh_s *)llh->height;
+        return (struct llh_s *)llh_G->height;
     }
 }
 

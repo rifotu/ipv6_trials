@@ -77,6 +77,25 @@ static void timestamp(struct wsn_data_s *wsn)
     return;
 }
 
+static int geolocate(struct wsn_data_s *wsn)
+{
+    if(NULL == read_frm_RTKlib()){
+        fprinf(stderr, " can't read from RTKli\n");
+        return -1;
+    }
+
+
+
+
+    
+        
+    
+
+
+}
+
+
+
 void * prep_a_set_of_wsn_data(void)
 {
     struct wsn_data_s *wsn = NULL;
@@ -85,7 +104,7 @@ void * prep_a_set_of_wsn_data(void)
 
     // TODO
     // get number of wsn nodes & correspending addresses
-    // Go into a for loop 
+    // Go into a for loop {
     // Timestamp & Geolocate data set
 
     wsn = (struct wsn_data_s *)malloc(sizeof(struct wsn_data_s *));
@@ -98,14 +117,11 @@ void * prep_a_set_of_wsn_data(void)
     }
 
     timestamp(wsn);
-    geolocate(
+    geolocate(wsn);
 
-
+    return (void *)wsn;
 }
-
-
         
-
 
 static void * get_wsn_info(void)
 {
