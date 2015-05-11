@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#define COMBINER_ID  87
 
 // Global Variables
 struct config_s *wsn_config_G;
@@ -15,7 +16,7 @@ const char ipv6_addresses_G[2][25] = {
     {"aaaa::212:4b00:43c:4be5"}
 };
 
-const int PORT_NUMBER = 207;
+const int PORT_NUMBER = 3000;
 
 // Structure definitions
 typedef struct raw_node_data_s{
@@ -30,17 +31,22 @@ typedef struct raw_node_data_s{
 }raw_node_data_t;
 
 typedef struct wsn_data_s{
+    struct time_llh_s time_llh;
+    list* llist_wsn;         // holds raw data for each sensor in the network 
+}wsn_data_t;
+
+typedef struct time_llh_s{
     int combinerID;
-    list* llist_wsn;
+    int number_of_nodes;
     struct tm timestamp;
     float latitude;
     float longitude;
-    float height;    
-}wsn_data_t;
+    float height;
+}time_llh_t;
 
 typedef struct wsn_info_s{
     int number_of_nodes;
-    list *ll_node_info; 
+    list *ll_node_prop; 
     //TODO: Determine further parameters
 }wsn_info_t;
 
@@ -54,12 +60,22 @@ typedef struct node_prop_s{
 typedef struct wsn_config_s{
     wsn_info_t *wsn_info;
     int readout_period;
+    list *ll_wsn_data_history;
     //TODO:  Determine further parameters
 }wsn_config_t;
 
 
 // Private Function Prototypes
 static void timestamp(void *p);
+static int geolocate(struct wsn_data_s *wsn);
+static void * get_wsn_info(void);
+static void free_ll_node_prop(void *data);
+static void free_ll_raw_data(void *data);
+static void free_ll_wsn_history(void *data);
+static void * get_mem_for_raw_data(void);
+static size_t size_of_raw_data(void);
+static void *append_node_id(void *ptr, struct in6_addr sin6_addr);
+static void * get_data_from_sensor(char *ip_addr, int port);
 
 
 static void timestamp(struct wsn_data_s *wsn)
@@ -73,7 +89,7 @@ static void timestamp(struct wsn_data_s *wsn)
     fprintf(stdout,"now: %d-%d-%d %d:%d:%d\n", tm.tm_year + 1900, tm.tm_mon + 1,
                                                tm.tm_mday, tm.tm_hour, tm.tm_min,
                                                tm.tm_sec);
-    wsn->timestamp = tm;
+    wsn->time_llh.timestamp = tm;
     return;
 }
 
@@ -84,14 +100,25 @@ static int geolocate(struct wsn_data_s *wsn)
         return -1;
     }
 
+    wsn->time_llh.latitude = get_latitude();
+    wsn->time_llh.longitude = get_longitude();
+    wsn->time_llh.height = get_height();
 
 
+}
 
+void record_a_set_of_wsn_data(void *ptr)
+{
+    struct wsn_data_s *wsn_data = ptr;
+
+    push_front(wsn_config_G->llist_wsn_data_history, wsn_data);
     
-        
-    
+    // check whether we have passed the recording limit
+    if(20 <= size(wsn_config_G->llist_wsn_data_history) ){
+        remove_back(wsn_config_G->llist, free_ll_wsn_history);
+    }
 
-
+    return;
 }
 
 
@@ -111,7 +138,7 @@ void * prep_a_set_of_wsn_data(void)
     wsn->llist_wsn = create_list();
 
     for(int i=0; i < wsn_config_G->wsn_info->number_of_nodes; i++){
-        prop = (struct node_prop_s *)get_node_data_at_index(wsn_config_G->wsn_info->ll_node_info, i);
+        prop = (struct node_prop_s *)get_node_data_at_index(wsn_config_G->wsn_info->ll_node_prop, i);
         raw_data = get_data_from_sensor(prop->ipv6_address, prop->port);
         push_front(wsn->llist_wsn, raw_data);
     }
@@ -121,7 +148,50 @@ void * prep_a_set_of_wsn_data(void)
 
     return (void *)wsn;
 }
-        
+
+int calc_size_for_unrolled_data(void *ptr)
+{
+    if(NULL == ptr){ return -1; }
+
+    struct wsn_data_s *wsn = ptr;
+
+    msize = sizeof(struct time_llh_s) + 
+            sizeof(raw_node_data_t) * wsn->time_llh.number_of_nodes;
+
+    return msize;
+}
+    
+    
+
+void * unroll_wsn_data(void *ptr)
+{
+    uint8_t *unrolled_p = NULL;
+    struct wsn_data_s *wsn = ptr;
+    int msize = 0;
+    int offset = 0;
+
+    msize = calc_size_for_unrolled_data(wsn);
+
+    unrolled_p = (uint8_t *)malloc(sizeof(uint8_t) * msize);
+
+    memcpy(unrolled_p, wsn, sizeof(struct time_llh_s));
+
+    for(int i=0; i < wsn->time_llh.number_of_nodes; i++){
+
+        offset = sizeof(struct time_llh_s) + i * sizeof(struct raw_node_data_s);
+
+        memcpy( unrolled_p + offset,
+                (void *)get_node_data_at_index(wsn->llist_wsn, i),
+                sizeof(struct raw_node_data_s));
+
+    }
+
+    return (void *)wsn;
+}
+
+
+
+
 
 static void * get_wsn_info(void)
 {
@@ -154,8 +224,9 @@ int initiate_wsn(void)
 {
     //TODO: have the tunslip interface up
     wsn_config_G = malloc(sizeof(struct config_s));
-    wsn_config_G->readout_period = 5;
+    wsn_config_G->readout_period = 5;  // in terms of minutes
     wsn_config_G->wsn_info = (wns_info_t *)get_wsn_info();
+    wsn_config_G->ll_wsn_data_history = create_list();
     return 0;
 
 }
@@ -163,22 +234,35 @@ int initiate_wsn(void)
 int dismiss_wsn(void)
 {
     //TODO: have the tunslip interface down
-    empty_list(wsn_config_G->wsn_info->ll_node_prop, free_linked_list_data);
+    empty_list(wsn_config_G->wsn_info->ll_node_prop, free_ll_node_prop);
+    empty_list(wsn_config_G->ll_wsn_data_history, free_ll_wsn_history);
     free(wsn_config_G->wsn_info);
     free(wsn_config_G);
     return 0;
 }
 
-static void free_linked_list_data(void *data)
+static void free_ll_node_prop(void *data)
 {
     free(data);
     return;
 }
 
+static void free_ll_raw_data(void *data)
+{
+    free(data);
+    return;
+}
+
+static void free_ll_wsn_history(void *data)
+{
+    struct wsn_data_s *wsn_dp = data;   // assign wsn data pointer
+
+    empty_list(wsn_dp->llist_wsn, free_ll_raw_data);
+    free(wsn_dp);
+}
 
 
-
-void * get_mem_for_raw_data(void)
+static void * get_mem_for_raw_data(void)
 {
 
     struct raw_node_data_s* raw_buf = NULL;
@@ -189,12 +273,12 @@ void * get_mem_for_raw_data(void)
     return raw_buf;
 }
 
-size_t size_of_raw_data(void)
+static size_t size_of_raw_data(void)
 {
     return sizeof(struct raw_node_data_s);
 }
 
-void *append_node_id(void *ptr, struct in6_addr sin6_addr)
+static void *append_node_id(void *ptr, struct in6_addr sin6_addr)
 {
     struct raw_node_data_s *node = ptr;
 
@@ -205,7 +289,7 @@ void *append_node_id(void *ptr, struct in6_addr sin6_addr)
 
 
 // IPv6 communication with the sensor nodes
-void * get_data_from_sensor(char *ip_addr, int port)
+static void * get_data_from_sensor(char *ip_addr, int port)
 {
     struct sockaddr_in6 serv_addr;
     socklen_t slen = sizeof(serv_addr);
@@ -249,7 +333,9 @@ void * get_data_from_sensor(char *ip_addr, int port)
 
     append_node_id(raw_buf, &serv_addr.sin6_addr);
 
-    print_sensor_payload
+    //print_sensor_payload();
+    close(sockfd);
+
     return raw_buf;
 }
                                        
