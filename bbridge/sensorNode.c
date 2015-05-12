@@ -190,9 +190,6 @@ void * unroll_wsn_data(void *ptr)
 }
 
 
-
-
-
 static void * get_wsn_info(void)
 {
     struct wsn_info_s *wsn_info_p = NULL;
