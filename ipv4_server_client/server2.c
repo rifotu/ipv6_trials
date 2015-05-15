@@ -13,10 +13,20 @@
 
 // Constant Global Variables
 const int maxPayloadSize = 512;
+const char *rawDataFile = "rawData.sql";
+const char *geoLocationFile = "geoLocation.sql";
 
-list *llist_dataset_G = NULL;
+// Global Variables
+struct config_s config_G;
+
 
 // Structure definitions
+typedef struct config_s{
+    FILE *fp_raw;
+    FILE *fp_geo;
+    list *llist_dataset;
+}config_t;
+
 typedef struct raw_node_data_s{
     int16_t accel_x;
     int16_t accel_y;
@@ -68,27 +78,109 @@ struct wsn_data_t * roll_wsn_data(void *ptr, int size)
          
 int add_rolled_wsn_data_to_ll(struct wsn_data_t *wsn)
 {
-    if(NULL == wsn || NULL == llist_dataset_G){
+    if(NULL == wsn || NULL == config_G.llist_dataset_G){
         return -1;
     }
 
-    push_front(wsn, llist_dataset_G);
+    push_front(wsn, config_G.llist_dataset);
     return 0;
 }
 
+
+int get_ll_size(void)
+{
+    return size(config_G.llist_dataset);
+}
+
+static void print_sensor_payload(struct sensor_info_s *sensorInfo)
+{
+
+        printf("P:%+6ld\n", sensorInfo->pressure);
+        printf("T2:%+3d\n", sensorInfo->temp);
+        printf("X:%+6d | Y:%+6d | Z:%+6d\n",  sensorInfo->accel_x,
+                                              sensorInfo->accel_y,
+                                              sensorInfo->accel_z );
+        printf("H: %.2f\n", sensorInfo->humidity);
+        printf("L: %.2f\n", sensorInfo->luminosity);
+}
+
+int prep_raw_data_file(struct wsn_data_t *wsn)
+{
+    float lng = wsn->time_llh.longitude;
+    float ltd = wsn->time_llh.latitude;
+    struct tm tm = wsn->time_llh.timestamp;
+    struct raw_node_data_s *raw = NULL;
+    
+    
+    fprintf(config_G.fp_raw,"INSERT INTO raw (the_geom, latitude, longitude, ax, ay,
+                                              az, temp, pres, humidity, luminosity,
+                                              combiner, time) VALUES\n");
+    for(int i=0; i < size(wsn->llist_wsn) ; i++){
+
+        raw = get_node_data_at_index(wsn->llist_wsn, i);
+
+        fprintf(config_G.fp_raw,"ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"Point\",\"coordinates\":[%.8f,%8f]}'),4326),", ltd, lng );
+        fprintf(config_G.fp_raw,"%.8f,%.8f, %+6d, %+6d, %+6d, %+3d, %+6ld, %.2f, %d, %d:%d:%d)",
+                                ltd, lng, raw->accel_x, raw->accel_y raw_accel_z, raw->temp,
+                                raw->pressure, raw->humidity, raw->luminosity, wsn->time_llh.combinerID,
+                                tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+        if(i == size(wsn->llist_wsn) - 1){
+            fprintf(config_G.fp_raw,",\n");
+        }else{
+            fprintf(config_G.fp_raw,"\n");
+        }
+        fprintf(config_G.fp_raw,";");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+    
+    
+
+
+
 int init_stuff(void)
 {
-    create_list(llist_dataset_G);
+    // initialize everything
+    config_G.fp_raw = fopen( rawDataFile, "w");
+    config_G.fp_geo = fopen( geoLocationFile, "w");
+    create_list(config_G.llist_dataset);
     return 0;
 }
 
 int dismiss_stuff(void)
 {
-    // empty stuff
+    // deinitialize everything
+    fclose(config_G.fp_raw);
+    fclose(config_G.fp_geo);
+    empty_list(config_G.llist_dataset, free_ll_wsn_history)
 
 }
 
-static void * free
+static void free_ll_raw_data(void *data)
+{
+    free(data);
+    return;
+}
+
+static void free_ll_wsn_history(void *data)
+{
+    struct wsn_data_s *wsn_dp = data;
+
+    empty_list(wsn_dp->llist_wsn, free_ll_raw_data);
+    free(wsn_dp);
+    return;
+}
 
 
 
