@@ -8,6 +8,12 @@
 #include <time.h>
 #include <stdint.h>
 
+//#define ZEROS_13  10000000000
+//#define ZEROS_4   10000
+
+const float zeros_13 = 10000000000.0;
+const float zeros_4 = 10000.0;
+
 #pragma pack(1)
 // Structure definitions
 typedef struct raw_node_data_s{
@@ -16,16 +22,20 @@ typedef struct raw_node_data_s{
     int16_t accel_z;
     uint16_t temp;
     uint32_t pressure;
-    float humidity;
-    float luminosity;
+    //float humidity;
+    //float luminosity;
+    int humidity;
+    int luminosity;
     unsigned char addr[16]; /* IPv6 address */
 }raw_node_data_t;
 
 typedef struct time_llh_s{
     int combinerID;
     int number_of_nodes;
-    float latitude;
-    float longitude;
+    //float latitude;
+    //float longitude;
+    long long latitude;
+    long long longitude;
 }time_llh_t;
 
 #pragma pack()
@@ -41,8 +51,36 @@ int set_interface_attribs (int fd, int speed, int parity);
 static void *prep_time_llh(void);
 static void *prep_node_data(void);
 static float gen_float_random(void);
+static long long gen_coordinate(void);
+static int gen_sensor_data(void);
 
 
+static long long gen_coordinate(void)
+{
+    double a = 5.0;
+    double ll = 0.0;
+
+    ll = (((double)rand()/(double)(RAND_MAX)) * a);
+    //printf("gen coordinate double: %f\n", ll);
+    ll *= zeros_13;
+    //printf("gen coordinate double: %f\n", ll);
+    //printf("gen coordinate int: %lld\n", (long long)ll );
+    return  (long long )ll;
+}
+
+static int gen_sensor_data(void)
+{
+    float a = 5.0;
+    float ll = 0.0;
+    ll = (((float)rand()/(float)(RAND_MAX)) * a);
+    //printf("gen coordinate double: %f\n", ll);
+    ll *= zeros_4;
+    //printf("gen coordinate double: %f\n", ll);
+    //printf("gen coordinate float: %d\n", (int)ll );
+    return  (int)ll;
+}
+    
+    
 
 
 static float gen_float_random(void)
@@ -62,8 +100,8 @@ static void *prep_node_data(void)
     raw->accel_z =  rand() % 15 - 7;
     raw->temp = rand() % 30;
     raw->pressure = rand() % 1000;
-    raw->humidity = gen_float_random();
-    raw->luminosity = gen_float_random();
+    raw->humidity = gen_sensor_data();
+    raw->luminosity = gen_sensor_data();
     memcpy(raw->addr, "hello world", strlen("hello world"));
 
     return raw;
@@ -83,8 +121,8 @@ static void *prep_time_llh(void)
     time_llh->combinerID = rand() % 5;
     //time_llh->number_of_nodes = rand() % 3 + 1;
     time_llh->number_of_nodes = 2;
-    time_llh->latitude = gen_float_random();
-    time_llh->longitude = gen_float_random();
+    time_llh->latitude = gen_coordinate();
+    time_llh->longitude = gen_coordinate();
 
     return time_llh;
 }
@@ -133,8 +171,8 @@ void print_uart_data(uint8_t *buf)
 
     printf("combiner id: %d\n", time_llh->combinerID);
     printf("number of nodes. %d\n", time_llh->number_of_nodes);
-    printf("latitude: %.8f\n", time_llh->latitude);
-    printf("longitude: %.8f\n", time_llh->longitude);
+    printf("latitude: %lld\n", time_llh->latitude);
+    printf("longitude: %lld\n", time_llh->longitude);
 
     for(int i=0; i < time_llh->number_of_nodes; i++)
     {
@@ -146,8 +184,8 @@ void print_uart_data(uint8_t *buf)
         printf("X:%+6d | Y:%+6d | Z:%+6d\n",  raw->accel_x,
                                               raw->accel_y,
                                               raw->accel_z );
-        printf("H: %.2f\n", raw->humidity);
-        printf("L: %.2f\n", raw->luminosity);
+        printf("H: %d\n", raw->humidity);
+        printf("L: %d\n", raw->luminosity);
     }
     
 }
@@ -213,8 +251,8 @@ int main(void)
 {
     uint8_t *buf = NULL;  // consider having this buffer static and NOT dynamic
     int len = 0;
-    char *portname = "/dev/ttyS1";
-    //char *portname = "/dev/ttyO1";
+    //char *portname = "/dev/ttyS1";
+    char *portname = "/dev/ttyO1";
     
     int fd = open (portname, O_RDWR | O_NOCTTY | O_SYNC);
 

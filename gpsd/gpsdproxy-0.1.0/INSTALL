@@ -1,0 +1,64 @@
+GPSDproxy - Copyright (C) 2009 Niccolo Rigacci <niccolo@rigacci.org>
+
+==== Compile and install ====
+
+To compile and install gpsdproxy:
+
+make && make install
+
+If you are cross-compiling, e.g. compiling for the OpenMoko armv4t
+distribution on a i386 GNU/Linux box, install the proper toolchain
+and run:
+
+. /usr/local/openmoko/arm/setup-env
+make
+
+If you want to start gpsdproxy automatically at bootstrap, copy 
+the start/stop script in the proper directory and assure that the 
+program is started after gpsd, e.g. for the OpenMoko distribution 
+do the following:
+
+cp gpsdproxy.sh /etc/init.d/gpsdproxy
+update-rc.d gpsdproxy defaults 40 20
+
+
+==== Configuration file ====
+
+Create the configuration file /etc/default/gpsdproxy, where you 
+can specify the client identity and the server address and port:
+
+client_id="Rigacci.Org"
+remote_host="172.16.123.123"
+remote_port="2948"
+
+Gpsdproxy reads GPS position from a gpsd running on the 
+localhost, if you want to get position from a remote gpsd, use 
+the "remote_host" and "remote_port" options. Gpsdproxy 
+communicates its position to the remote gpsdproxy server every 30 
+seconds by default, use the "interval" option to change it.
+
+
+==== Command line options ====
+
+Usage: gpsdproxy [-b] [-f pid_file] [-d debug]
+                 -h host [-p port] [-i id] [-t interval]
+                 [-s gpsd_host] [-r gpsd_port]
+
+  -b            Be daemon: detach from the terminal and run in 
+                background.
+  -f pid_file   Where to write PID file, default none.
+  -d debug      Debug level (0-7), default 7, max verbose.
+  -h host       Remote server to which communicate our position.
+  -p port       UDP port of the remote server, default 2948.
+  -i id         A string which identify the client.
+  -t interval   Interval in seconds for position update, default 
+                30.
+  -s gpsd_host  Host where gpsd is running, default on localhost.
+  -r gpsd_port  TCP port of gpsd, default 2947.
+
+
+==== TODO ====
+
+* Authenticate the client with a password.
+* Encrypt data.
+* Do some sort of aknowledgment and retransmission.

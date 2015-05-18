@@ -1,0 +1,19 @@
+#!/usr/bin/python
+
+import gps, gps.fake, time
+
+logfile = "nmea.txt"
+port = 6677
+
+def fakehook(linenumber, fakegps):
+    print "linenumber", linenumber
+    time.sleep(1)
+    return True
+
+print "Try this program connecting to port %d" % (port)
+print 'And issuing the command: ?WATCH={"enable":true,"json":true};'
+
+test = gps.fake.TestSession(port=port, verbose=2, options="")
+test.spawn()
+test.gps_add(logfile, speed=4800, pred=fakehook)
+test.run()

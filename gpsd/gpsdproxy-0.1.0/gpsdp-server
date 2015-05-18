@@ -1,0 +1,230 @@
+#!/usr/bin/python
+# -*- encoding: utf8 -*-
+#
+# Copyright (C) 2009-2011 Niccolo Rigacci
+#
+# This file is part of GPSDproxy.
+#
+# GPSDproxy is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# GPSDproxy is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with GPSDproxy. If not, see <http://www.gnu.org/licenses/>.
+#
+#
+# This is an example of a GPSDproxy server. Position data
+# received from a GPSDproxy client will be stored into a
+# PostgreSQL/PostGIS database.
+#
+# Author        Niccolo Rigacci <niccolo@rigacci.org>
+# Version       0.6  2011-04-05
+
+
+import ConfigParser, datetime, logging, logging.handlers, os, psycopg2, signal, socket, sys
+
+be_daemon  = True
+progname   = "gpsdp-server"
+log_tag    = progname
+log_level  = logging.DEBUG
+cfg_file = "/etc/gpsdproxy.cfg"
+pid_file = "/var/run/%s.pid" % (progname)
+
+#---------------------------------------------------------------
+# Read the configuration file.
+#---------------------------------------------------------------
+config = ConfigParser.RawConfigParser()
+config.read(cfg_file)
+try:
+    udp_port   = config.getint(progname, "udp_port")
+    db_connect =    config.get(progname, "db_connect")
+except:
+    sys.stderr.write("Error parsing configuration file: %s\n" % (cfg_file,))
+    sys.exit(1)
+
+#---------------------------------------------------------------
+# Return the ID if name/password can be authenticated, or None.
+#---------------------------------------------------------------
+def authenticate(login, password, curs):
+    sql = "SELECT id FROM objects WHERE name = %s AND password = %s"
+    if curs:
+        curs.execute(sql, (login, password))
+        res = curs.fetchone()
+        if res:
+            return res[0]
+    return None
+
+#---------------------------------------------------------------
+# Remove PID file on exit.
+#---------------------------------------------------------------
+def exit_nicely(signum, frame):
+    logger.info("Exiting")
+    try: conn.close()
+    except: pass
+    try: socket.UDPSock.close()
+    except: pass
+    try: logging.shutdown()
+    except: pass
+    try: os.remove(pid_file)
+    except: pass
+    sys.exit(0)
+
+#---------------------------------------------------------------
+# Function to fork into background and be daemon.
+#---------------------------------------------------------------
+def daemon():
+
+    # Check for existing PID file.
+    if os.path.exists(pid_file):
+        sys.stderr.write("Error: cannot daemonize, pidfile exists: %s\n" % (pid_file))
+        sys.exit(1)
+
+    # Do fork.
+    try:
+        pid = os.fork()
+        if pid > 0:
+            sys.exit(0) # Exit first parent.
+    except OSError, e:
+        sys.stderr.write("Error: fork() failed: (%d) %s\n" % (e.errno, e.strerror))
+        sys.exit(1)
+
+    # Write PID file.
+    try:
+        pid = str(os.getpid())
+        file(pid_file,'w+').write("%s\n" % pid)
+    except:
+        sys.stderr.write("Error: cannot write pidfile: %s\n" % (pid_file))
+        sys.exit(1)
+
+    # Decouple from parent environment.
+    os.chdir(os.sep)
+    os.umask(0)
+    os.setsid()
+
+    # Close standard file descriptors.
+    sys.stdin.close()
+    sys.stdout.close()
+    sys.stderr.close()
+
+#---------------------------------------------------------------
+# Start (eventually in background) and setup logging.
+#---------------------------------------------------------------
+signal.signal(signal.SIGTERM, exit_nicely)
+signal.signal(signal.SIGHUP, exit_nicely)
+if be_daemon: daemon()
+pid = os.getpid()
+logger = logging.getLogger(log_tag)
+logger.setLevel(log_level)
+if be_daemon:
+    # Log to syslogd()
+    log_format = "%(name)s[" + str(pid) + "]: %(message)s"
+    log_handler = logging.handlers.SysLogHandler("/dev/log")
+    log_handler.setFormatter(logging.Formatter(log_format))
+else:
+    # Log to console.
+    log_format = "%(asctime)s %(name)s[" + str(pid) + "]: %(message)s"
+    log_handler = logging.StreamHandler()
+    log_handler.setFormatter(logging.Formatter(log_format))
+logger.addHandler(log_handler)
+
+#---------------------------------------------------------------
+# Open the database connection.
+#---------------------------------------------------------------
+logger.debug("Opening database connection")
+try:
+    conn = psycopg2.connect(db_connect)
+    curs = conn.cursor()
+except:
+    conn = None
+    curs = None
+    logger.error("Cannot connect to the database")
+
+#---------------------------------------------------------------
+# IP address and UDP port. An empty address is INADDR_ANY.
+#---------------------------------------------------------------
+logger.debug("Binding UDP port %s", udp_port)
+bind_addr = ("", udp_port)
+try:
+    socket.UDPSock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+    socket.UDPSock.bind(bind_addr)
+except:
+    logger.error("Cannot bind UDP port %d: %s" % (udp_port, sys.exc_info()[1]))
+    sys.exit(1)
+logger.info("Up and running: waiting UDP packets on port %d", udp_port)
+
+#---------------------------------------------------------------
+# Main loop.
+#---------------------------------------------------------------
+while 1:
+
+    # Get some data (max 1024 bytes).
+    data, remote_addr = socket.UDPSock.recvfrom(1024)
+    # UTC timestamp of received data.
+    timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    if not data:
+        logger.info("Connection closed from %s" % (remote_addr[0]))
+    else:
+        # Data example:
+        # Rigacci.Org:demo,1303122369.00,43.819376667,11.140949500,34.50,0.03,295.60,1,08,1.2
+        logger.debug("Received data: %s" % (data))
+        gpsd = data.strip().split(",")
+        if len(gpsd) < 11:
+            logger.info("Incomplete data from [%s]" % (remote_addr[0]))
+            continue
+
+        # Check if object is authorized, idtag field is login:passwd
+        idtag = gpsd[0]
+        if idtag.find(":") == -1:
+            idtag += ":"
+        (login, passwd) = idtag.split(":", 1)
+        id = authenticate(login, passwd, curs)
+        if not id:
+            logger.info("Auth failed: %s [%s]" % (login, remote_addr[0]))
+
+        # Validate GPS data.
+        x, y, z    = None, None, None
+        speed      = None
+        heading    = None
+        nmea_fix   = None
+        sat_used   = None
+        hdop       = None
+        try:
+            posix_time = float(gpsd[1])
+            if (gpsd[2] != "nan"): y        = float(gpsd[2])
+            if (gpsd[3] != "nan"): x        = float(gpsd[3])
+            if (gpsd[4] != "nan"): z        = float(gpsd[4])
+            if (gpsd[5] != "nan"): speed    = float(gpsd[5])
+            if (gpsd[6] != "nan"): heading  = float(gpsd[6])
+            if (gpsd[7] != "nan"): nmea_fix = int(gpsd[7])
+            if (gpsd[8] != "nan"): sat_used = int(gpsd[8])
+            if (gpsd[9] != "nan"): hdop     = float(gpsd[9])
+        except:
+            pass
+
+        # If we have a valid position, insert data into the database.
+        logger.info("Position from %s [%s]: %f %f %f" % (login, remote_addr[0], posix_time, x, y))
+        if x != None and y != None:
+            # Convert POSIX time into UTC time string.
+            wpt_timestamp = datetime.datetime.utcfromtimestamp(posix_time).strftime("%Y-%m-%d %H:%M:%S")
+            # Build the SQL INSERT statement.
+            # We use EWKT (Extended Well-Knwown Text) instead of OGC WKT (could support 3D).
+            # Elevation, heading and speed can be NULL.
+            sql  = "INSERT INTO positions"
+            sql += " (idobject, rcvd_date_time, inet_addr, date_time, wpt, elevation, speed, heading, sat_used, hdop)"
+            sql += " VALUES (%s, %s, %s, %s, ST_SetSRID(ST_MakePoint(%s, %s), %s), %s, %s, %s, %s, %s)";
+            if conn:
+                try:
+                    curs.execute(sql, (id, timestamp, remote_addr[0], wpt_timestamp, x, y, 4326, z, speed, heading, sat_used, hdop))
+                    conn.commit()
+                except:
+                    logger.error("INSERT failed: %s" % (sys.exc_info()[1]))
+                    conn.rollback()
+
+exit_nicely(None, None)

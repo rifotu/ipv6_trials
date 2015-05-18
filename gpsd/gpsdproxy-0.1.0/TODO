@@ -1,0 +1,6 @@
+Use some crypto algorithm for communications, examples:
+
+  * http://en.wikipedia.org/wiki/Tiny_Encryption_Algorithm
+  * Kernel crypto API:
+    http://www.mjmwired.net/kernel/Documentation/crypto/api-intro.txt
+

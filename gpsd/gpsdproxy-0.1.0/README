@@ -1,0 +1,18 @@
+GPSDproxy - Copyright (C) 2009 Niccolo Rigacci <niccolo@rigacci.org>
+
+GPSDproxy is a small program which reads GPS data from a running gpsd
+process (http://gpsd.berlios.de/) and forwards it to a remote server
+via an UDP connection.
+
+GPSDproxy is intended to be run on GPS enabled mobile devices. The main
+features are:
+
+  * Very low traffic: can upload the position every 10 seconds, 24h/24h,
+    7days/week and consume less than 100Mb/month (telco-plan friendly).
+  * Assume an unreliable connection, like GPRS mobile. Uses UDP
+    protocol without TCP/IP retransmission overhead. No akwnoledgment
+    from the server is required. Assumes that some data can be lost
+    (future versions can implement some sort of aknowledge/retransmit).
+  * Firewall friendly: mobile GPRS connections are often placed behind
+    a NAT firewall, gpsdproxy works with just one outgoing UPD port.
+  * Written in C for performance and small footprint.
