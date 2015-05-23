@@ -96,7 +96,6 @@ int main(int argc, char** argv)
             err("sendto()");
         }
 
-20 Nisan Antsis Elektronik
 
         fromSize = sizeof(fromAddr);
         if(respStringLen = recvfrom(sockfd, echoBuffer, len, 0, 
