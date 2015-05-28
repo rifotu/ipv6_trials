@@ -6,16 +6,21 @@
 #include <unistd.h>
 #include <string.h>
 
+const float zeros_13 = 10000000000.0;
+const float zeros_4 = 10000.0;
+
+
 // Structure definitions
 typedef struct llh_s{
-    float longitude;
-    float latitude;
-    float height;
+    double longitude;
+    double latitude;
+    double height;
 }llh_t;
 
+
 // Global Variables
-static const int  port = 2137;
-static const char *ip = "127.0.0.1";
+static const int  port = 3001;
+static const char *ip = "localhost";
 static int rtk_socket_G;
 static llh_t *llh_G;
 
@@ -83,109 +88,47 @@ void * read_frm_RTKlib(void)
     }
 }
 
-float get_latitude(void)
+long long get_latitude(void)
 {
+    double lat = 0.0;
+
     if(NULL == llh_G){
         return -10000;
     }else{
-        return (struct llh_s *)llh_G->latitude;
+
+        lat = (struct llh_s *)llh_G->latitude;
+        lat *= zeros_13;
+        return (long long)lat;
     }
 }
 
-float get_longitude(void)
+long long get_longitude(void)
 {
+
+    double lon = 0.0;
     if(NULL == llh_G){
         return -10000;
     }else{
-        return (struct llh_s *)llh_G->longitude;
+
+        lon = (struct llh_s *)llh_G->longitude;
+        lon *= zeros_13;
+        return (long long)lon;
     }
 }
 
-float get_height(void)
+long long get_height(void)
 {
+    double height = 0.0;
+
     if(NULL == llh_G){
         return -10000;
     }else{
-        return (struct llh_s *)llh_G->height;
+        
+        height = (struct llh_s *)llh_G->height;
+        height *= zeros_4;
+        return (long long)height;
     }
 }
 
 
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-   
     

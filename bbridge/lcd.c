@@ -8,8 +8,6 @@
 #include <time.h>
 #include <stdint.h>
 
-//#define ZEROS_13  10000000000
-//#define ZEROS_4   10000
 
 const float zeros_13 = 10000000000.0;
 const float zeros_4 = 10000.0;
@@ -126,6 +124,15 @@ static void *prep_time_llh(void)
 
     return time_llh;
 }
+uint8_t *prep_uart_data(void *ptr)
+{
+    struct time_llh_s *time_llh = NULL;
+    struct raw_node_data_s *raw =  NULL;
+    uint8_t *buf = NULL;
+    int size = 0;
+    int offset = 0;
+
+    time_llh = pre
 
 uint8_t * prep_uart_data(void)
 {
@@ -230,7 +237,7 @@ int set_interface_attribs (int fd, int speed, int parity)
         return 0;
 }
 
-void set_blocking (int fd, int should_block)
+void set_blocking(int fd, int should_block)
 {
         struct termios tty;
         memset (&tty, 0, sizeof tty);

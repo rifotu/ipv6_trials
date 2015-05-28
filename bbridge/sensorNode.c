@@ -19,6 +19,29 @@ const char ipv6_addresses_G[2][25] = {
 const int PORT_NUMBER = 3000;
 
 // Structure definitions
+typedef struct raw_node_data_lcd_s{
+    int16_t accel_x;
+    int16_t accel_y;
+    int16_t accel_z;
+    uint16_t temp;
+    uint32_t pressure;
+    uint16_t humidity;
+    uint16_t luminosity;
+    unsigned char addr[16];
+}raw_node_data_lcd_t;
+
+typedef struct time_llh_lcd_s{
+    int combinerID;
+    int number_of_nodes;
+    long long latitude;
+    long long longitude;
+}time_llh_lcd_t;
+
+typedef struct wsn_data_s{
+    struct time_llh_s time_llh;
+    list* llist_wsn;         // holds raw data for each sensor in the network 
+}wsn_data_t;
+
 typedef struct raw_node_data_s{
     int16_t accel_x;
     int16_t accel_y;
@@ -30,26 +53,28 @@ typedef struct raw_node_data_s{
     unsigned char addr[16]; /* IPv6 address */
 }raw_node_data_t;
 
-typedef struct wsn_data_s{
-    struct time_llh_s time_llh;
-    list* llist_wsn;         // holds raw data for each sensor in the network 
-}wsn_data_t;
-
 typedef struct time_llh_s{
     int combinerID;
     int number_of_nodes;
     struct tm timestamp;
-    float latitude;
-    float longitude;
-    float height;
+    long long latitude;
+    long long longitude;
+    long long height;
 }time_llh_t;
 
+// holds information regarding 
+// the number of nodes and their
+// properties
 typedef struct wsn_info_s{
     int number_of_nodes;
     list *ll_node_prop; 
     //TODO: Determine further parameters
 }wsn_info_t;
 
+
+/* holds information regarding
+   how to communicate with sensor
+   nodes */
 typedef struct node_prop_s{
     char ipv6_address[25];
     int port;
@@ -95,32 +120,32 @@ static void timestamp(struct wsn_data_s *wsn)
 
 static int geolocate(struct wsn_data_s *wsn)
 {
-    if(NULL == read_frm_RTKlib()){
-        fprinf(stderr, " can't read from RTKli\n");
-        return -1;
-    }
+    //if(NULL == read_frm_RTKlib()){
+    //    fprinf(stderr, " can't read from RTKli\n");
+    //    return -1;
+    //}
 
     wsn->time_llh.latitude = get_latitude();
     wsn->time_llh.longitude = get_longitude();
     wsn->time_llh.height = get_height();
-
-
 }
 
+// Currently this function will not be used as
+// each dataset will be sent immediately and
+// won't be stored
 void record_a_set_of_wsn_data(void *ptr)
 {
     struct wsn_data_s *wsn_data = ptr;
 
-    push_front(wsn_config_G->llist_wsn_data_history, wsn_data);
+    push_front(wsn_config_G->ll_wsn_data_history, wsn_data);
     
     // check whether we have passed the recording limit
-    if(20 <= size(wsn_config_G->llist_wsn_data_history) ){
+    if(20 <= size(wsn_config_G->ll_wsn_data_history) ){
         remove_back(wsn_config_G->llist, free_ll_wsn_history);
     }
 
     return;
 }
-
 
 
 void * prep_a_set_of_wsn_data(void)
@@ -161,6 +186,15 @@ int calc_size_for_unrolled_data(void *ptr)
     return msize;
 }
     
+int calc_size_for_unrolled_lcd_data(void *ptr)
+{
+    if(NULL == ptr){return -1; }
+
+    struct wsn_data_s *wsn = ptr;
+
+    msize = sizeof(struct time_llh_lcd_s) +
+            sizeof(raw_node_data_lcd_t) * wsn->time_llh.number_of_nodes;
+}
     
 
 void * unroll_wsn_data(void *ptr)
@@ -186,9 +220,50 @@ void * unroll_wsn_data(void *ptr)
 
     }
 
-    return (void *)wsn;
+    return (void *)unrolled_p;
 }
 
+void * unroll_wsn_data_for_lcd(void *ptr)
+{
+    uint8_t *unrolled_p = NULL;
+    struct wsn_data_s *wsn = ptr;
+    struct time_llh_lcd_s llh_lcd; 
+    struct raw_node_data_s *raw_data = NULL;
+    struct raw_node_data_lcd_s raw_data_lcd;
+    int msize = 0;
+    int offset = 0;
+
+    msize = calc_size_for_unrolled_data(wsn);
+    unrolled_p = (uint8_t *)malloc(sizeof(uint8_t) * msize);
+
+    llh_lcd.combinerID = wsn->time_llh.combinerID;
+    llh_lcd.number_of_nodes = wsn->time_llh.number_of_nodes; 
+    llh_lcd.latitude = wsn->time_llh.latitude;
+    llh_lcd.longitude = wsn->time_llh.longitude;
+
+    memcpy(unrolled_p, &llh_lcd, sizeof(struct time_llh_lcd_s));
+
+    for(int i=0; i < wsn->time_llh.number_of_nodes; i++){
+
+        offset = sizeof(struct time_llh_lcd_s) + i * sizeof(struct raw_node_data_lcd_sj);
+
+        raw_data = (struct raw_node_data_s *)get_node_data_at_index(wsn->llist_wsn, i)
+
+        raw_data_lcd.accel_x = raw_data->accel_x;
+        raw_data_lcd.accel_y = raw_data->accel_y;
+        raw_data_lcd.accel_z = raw_data->accel_z;
+        raw_data_lcd.temp    = raw_data->temp;
+        raw_data_pressure    = raw_data->
+        memcpy( unrolled_p + offset,
+                (void *)get_node_data_at_index(wsn->llist_wsn, i),
+                sizeof(struct raw_node_data_s));
+
+    }
+
+
+
+    
+}
 
 static void * get_wsn_info(void)
 {
@@ -354,53 +429,38 @@ static void * get_data_from_sensor(char *ip_addr, int port)
 
 int main(int argc, char *argv[])
 {
-    int sockfd = 0, n = 0;
-    char recvBuff[1024];
-    struct sockaddr_in serv_addr; 
+    void *wsn = NULL;
+    void *wns_flat = NULL;
+    int size = 0;
 
-    if(argc != 2)
+
+    initiate_connection_2_cloud();
+    initiate_wsn();
+
+    while(1)
     {
-        printf("\n Usage: %s <ip of server> \n",argv[0]);
-        return 1;
-    } 
 
-    memset(recvBuff, '0',sizeof(recvBuff));
-    if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-    {
-        printf("\n Error : Could not create socket \n");
-        return 1;
-    } 
+        // returns a pointer of struct wsn_data_s
+        wsn = prep_a_set_of_wsn_data();
 
-    memset(&serv_addr, '0', sizeof(serv_addr)); 
+        // record a certain number of wsn data set
+        // in case you may need it in the future
+        // Don't worry about freeing stuff, as it
+        // will be handled later in dismiss_wsn function
+        record_a_set_of_wsn_data(wsn);
+        
+        // returns a buffer containing all data in flat format
+        wsn_flat = unroll_wsn_data(wsn);
+        size = calc_size_for_unrolled_data(wsn);
+        send_data_2_cloud(wsn_flat, size);
+        send_data_2_lcd(wsn_flat, size);
+        
+        
+        sleep(1);
+    }
 
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(5000); 
-
-    if(inet_pton(AF_INET, argv[1], &serv_addr.sin_addr)<=0)
-    {
-        printf("\n inet_pton error occured\n");
-        return 1;
-    } 
-
-    if( connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-    {
-       printf("\n Error : Connect Failed \n");
-       return 1;
-    } 
-
-    while ( (n = read(sockfd, recvBuff, sizeof(recvBuff)-1)) > 0)
-    {
-        recvBuff[n] = 0;
-        if(fputs(recvBuff, stdout) == EOF)
-        {
-            printf("\n Error : Fputs error\n");
-        }
-    } 
-
-    if(n < 0)
-    {
-        printf("\n Read error \n");
-    } 
+    dismiss_wsn();
+    kill_connection_2_cloud();
 
     return 0;
 }
