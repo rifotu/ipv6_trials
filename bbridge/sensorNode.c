@@ -439,8 +439,10 @@ int main(int argc, char *argv[])
     void *wsn = NULL;
     void *wns_flat = NULL;
     int size = 0;
+    pthread_t idThreads[1];
 
 
+    init_gpsd();
     initiate_connection_2_cloud();
     initiate_wsn();
     initiate_lcd_comm();
