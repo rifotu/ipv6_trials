@@ -9,6 +9,9 @@
 #include <stdint.h>
 
 
+int fd_lcd_G = 0;
+const char *lcd_port = "/dev/ttyO1";
+
 const float zeros_13 = 10000000000.0;
 const float zeros_4 = 10000.0;
 
@@ -46,158 +49,146 @@ void set_blocking (int fd, int should_block);
 int set_interface_attribs (int fd, int speed, int parity);
 
 // Private function prototypes
-static void *prep_time_llh(void);
-static void *prep_node_data(void);
-static float gen_float_random(void);
-static long long gen_coordinate(void);
-static int gen_sensor_data(void);
+//static void *prep_time_llh(void);
+//static void *prep_node_data(void);
+//static float gen_float_random(void);
+//static long long gen_coordinate(void);
+//static int gen_sensor_data(void);
 
 
-static long long gen_coordinate(void)
-{
-    double a = 5.0;
-    double ll = 0.0;
+//static long long gen_coordinate(void)
+//{
+//    double a = 5.0;
+//    double ll = 0.0;
+//
+//    ll = (((double)rand()/(double)(RAND_MAX)) * a);
+//    //printf("gen coordinate double: %f\n", ll);
+//    ll *= zeros_13;
+//    //printf("gen coordinate double: %f\n", ll);
+//    //printf("gen coordinate int: %lld\n", (long long)ll );
+//    return  (long long )ll;
+//}
+//
+//static int gen_sensor_data(void)
+//{
+//    float a = 5.0;
+//    float ll = 0.0;
+//    ll = (((float)rand()/(float)(RAND_MAX)) * a);
+//    //printf("gen coordinate double: %f\n", ll);
+//    ll *= zeros_4;
+//    //printf("gen coordinate double: %f\n", ll);
+//    //printf("gen coordinate float: %d\n", (int)ll );
+//    return  (int)ll;
+//}
+//    
+//static float gen_float_random(void)
+//{
+//    float a = 5.0;
+//    return (((float)rand()/(float)(RAND_MAX)) * a);
+//}
+//
+//static void *prep_node_data(void)
+//{
+//    struct raw_node_data_s *raw = NULL;
+//
+//    raw = (struct raw_node_data_s *)malloc(sizeof(struct raw_node_data_s));
+//
+//    raw->accel_x =  rand() % 10 - 5;
+//    raw->accel_y =  rand() % 20 - 10;
+//    raw->accel_z =  rand() % 15 - 7;
+//    raw->temp = rand() % 30;
+//    raw->pressure = rand() % 1000;
+//    raw->humidity = gen_sensor_data();
+//    raw->luminosity = gen_sensor_data();
+//    memcpy(raw->addr, "hello world", strlen("hello world"));
+//
+//    return raw;
+//}
+//
+//static void *prep_time_llh(void)
+//{
+//    int combinerID;
+//    int number_of_nodes;
+//    float latitude;
+//    float longitude;
+//
+//    struct time_llh_s *time_llh = NULL;
+//
+//    time_llh = (struct time_llh_s *)malloc(sizeof(struct time_llh_s));
+//
+//    time_llh->combinerID = rand() % 5;
+//    //time_llh->number_of_nodes = rand() % 3 + 1;
+//    time_llh->number_of_nodes = 2;
+//    time_llh->latitude = gen_coordinate();
+//    time_llh->longitude = gen_coordinate();
+//
+//    return time_llh;
+//}
+//
+//uint8_t * prep_uart_data(void)
+//{
+//    struct time_llh_s *time_llh = NULL;
+//    struct raw_node_data_s *raw = NULL;
+//    uint8_t *buf = NULL;
+//    int size = 0;
+//    int offset = 0;
+//    
+//    time_llh = prep_time_llh();
+//
+//    size = sizeof(struct time_llh_s) + time_llh->number_of_nodes * sizeof(struct raw_node_data_s);
+//    buf = (uint8_t *)malloc(sizeof(uint8_t) * size);
+//    memcpy(buf, time_llh, sizeof(struct time_llh_s));
+//    free(time_llh);
+//
+//    for(int i=0; i < time_llh->number_of_nodes; i++){
+//        offset = sizeof(struct time_llh_s) + i * sizeof(struct raw_node_data_s);
+//        raw = prep_node_data();
+//        memcpy(buf + offset, raw, sizeof(struct raw_node_data_s));
+//        free(raw);
+//    }
+//    
+//    return buf;
+//}
+//
+//int get_payload_size(uint8_t *buf)
+//{
+//    struct time_llh_s *time_llh = (struct time_llh_s *)buf;
+//    int len = sizeof(struct time_llh_s) + sizeof(struct raw_node_data_s) * time_llh->number_of_nodes;
+//    printf("buffer length: %d\n", len);
+//
+//    return len;
+//}
 
-    ll = (((double)rand()/(double)(RAND_MAX)) * a);
-    //printf("gen coordinate double: %f\n", ll);
-    ll *= zeros_13;
-    //printf("gen coordinate double: %f\n", ll);
-    //printf("gen coordinate int: %lld\n", (long long)ll );
-    return  (long long )ll;
-}
+//void print_uart_data(uint8_t *buf)
+//{
+//    struct time_llh_s *time_llh = NULL;
+//    struct raw_node_data_s *raw = NULL;
+//    int offset = 0;
+//
+//    time_llh = (struct time_llh_s *)buf;
+//
+//    printf("combiner id: %d\n", time_llh->combinerID);
+//    printf("number of nodes. %d\n", time_llh->number_of_nodes);
+//    printf("latitude: %lld\n", time_llh->latitude);
+//    printf("longitude: %lld\n", time_llh->longitude);
+//
+//    for(int i=0; i < time_llh->number_of_nodes; i++)
+//    {
+//        offset = sizeof(struct time_llh_s) + i * sizeof(struct raw_node_data_s);
+//        raw = (struct raw_node_data_s *)(buf + offset);
+//        //printf("P:%+6ld\n", raw->pressure);
+//        printf("P:%zu\n", raw->pressure);
+//        printf("T2:%+3d\n", raw->temp);
+//        printf("X:%+6d | Y:%+6d | Z:%+6d\n",  raw->accel_x,
+//                                              raw->accel_y,
+//                                              raw->accel_z );
+//        printf("H: %d\n", raw->humidity);
+//        printf("L: %d\n", raw->luminosity);
+//    }
+//    
+//}
 
-static int gen_sensor_data(void)
-{
-    float a = 5.0;
-    float ll = 0.0;
-    ll = (((float)rand()/(float)(RAND_MAX)) * a);
-    //printf("gen coordinate double: %f\n", ll);
-    ll *= zeros_4;
-    //printf("gen coordinate double: %f\n", ll);
-    //printf("gen coordinate float: %d\n", (int)ll );
-    return  (int)ll;
-}
-    
-    
-
-
-static float gen_float_random(void)
-{
-    float a = 5.0;
-    return (((float)rand()/(float)(RAND_MAX)) * a);
-}
-
-static void *prep_node_data(void)
-{
-    struct raw_node_data_s *raw = NULL;
-
-    raw = (struct raw_node_data_s *)malloc(sizeof(struct raw_node_data_s));
-
-    raw->accel_x =  rand() % 10 - 5;
-    raw->accel_y =  rand() % 20 - 10;
-    raw->accel_z =  rand() % 15 - 7;
-    raw->temp = rand() % 30;
-    raw->pressure = rand() % 1000;
-    raw->humidity = gen_sensor_data();
-    raw->luminosity = gen_sensor_data();
-    memcpy(raw->addr, "hello world", strlen("hello world"));
-
-    return raw;
-}
-
-static void *prep_time_llh(void)
-{
-    int combinerID;
-    int number_of_nodes;
-    float latitude;
-    float longitude;
-
-    struct time_llh_s *time_llh = NULL;
-
-    time_llh = (struct time_llh_s *)malloc(sizeof(struct time_llh_s));
-
-    time_llh->combinerID = rand() % 5;
-    //time_llh->number_of_nodes = rand() % 3 + 1;
-    time_llh->number_of_nodes = 2;
-    time_llh->latitude = gen_coordinate();
-    time_llh->longitude = gen_coordinate();
-
-    return time_llh;
-}
-uint8_t *prep_uart_data(void *ptr)
-{
-    struct time_llh_s *time_llh = NULL;
-    struct raw_node_data_s *raw =  NULL;
-    uint8_t *buf = NULL;
-    int size = 0;
-    int offset = 0;
-
-    time_llh = pre
-
-uint8_t * prep_uart_data(void)
-{
-    struct time_llh_s *time_llh = NULL;
-    struct raw_node_data_s *raw = NULL;
-    uint8_t *buf = NULL;
-    int size = 0;
-    int offset = 0;
-    
-    time_llh = prep_time_llh();
-
-    size = sizeof(struct time_llh_s) + time_llh->number_of_nodes * sizeof(struct raw_node_data_s);
-    buf = (uint8_t *)malloc(sizeof(uint8_t) * size);
-    memcpy(buf, time_llh, sizeof(struct time_llh_s));
-    free(time_llh);
-
-    for(int i=0; i < time_llh->number_of_nodes; i++){
-        offset = sizeof(struct time_llh_s) + i * sizeof(struct raw_node_data_s);
-        raw = prep_node_data();
-        memcpy(buf + offset, raw, sizeof(struct raw_node_data_s));
-        free(raw);
-    }
-    
-    return buf;
-}
-
-int get_payload_size(uint8_t *buf)
-{
-    struct time_llh_s *time_llh = (struct time_llh_s *)buf;
-    int len = sizeof(struct time_llh_s) + sizeof(struct raw_node_data_s) * time_llh->number_of_nodes;
-    printf("buffer length: %d\n", len);
-
-    return len;
-}
-
-void print_uart_data(uint8_t *buf)
-{
-    struct time_llh_s *time_llh = NULL;
-    struct raw_node_data_s *raw = NULL;
-    int offset = 0;
-
-    time_llh = (struct time_llh_s *)buf;
-
-    printf("combiner id: %d\n", time_llh->combinerID);
-    printf("number of nodes. %d\n", time_llh->number_of_nodes);
-    printf("latitude: %lld\n", time_llh->latitude);
-    printf("longitude: %lld\n", time_llh->longitude);
-
-    for(int i=0; i < time_llh->number_of_nodes; i++)
-    {
-        offset = sizeof(struct time_llh_s) + i * sizeof(struct raw_node_data_s);
-        raw = (struct raw_node_data_s *)(buf + offset);
-        //printf("P:%+6ld\n", raw->pressure);
-        printf("P:%zu\n", raw->pressure);
-        printf("T2:%+3d\n", raw->temp);
-        printf("X:%+6d | Y:%+6d | Z:%+6d\n",  raw->accel_x,
-                                              raw->accel_y,
-                                              raw->accel_z );
-        printf("H: %d\n", raw->humidity);
-        printf("L: %d\n", raw->luminosity);
-    }
-    
-}
-
-int set_interface_attribs (int fd, int speed, int parity)
+static int set_interface_attribs (int fd, int speed, int parity)
 {
         struct termios tty;
         memset (&tty, 0, sizeof tty);
@@ -237,7 +228,7 @@ int set_interface_attribs (int fd, int speed, int parity)
         return 0;
 }
 
-void set_blocking(int fd, int should_block)
+static void set_blocking(int fd, int should_block)
 {
         struct termios tty;
         memset (&tty, 0, sizeof tty);
@@ -253,6 +244,38 @@ void set_blocking(int fd, int should_block)
         if (tcsetattr (fd, TCSANOW, &tty) != 0)
                 printf ("error %d setting term attributes", errno);
 }
+
+int send_data_2_lcd(uint8_t *buf, int size)
+{
+    int n = 0;
+    n = write(fd, buf, size);
+    return n;
+}
+
+
+int initialize_lcd_comm(void)
+{
+
+    fd_lcd_G = open( lcd_port, O_RDWR | O_NOCTTY | O_SYNC);
+    set_interface_attribs(fd_lcd_G, B115200, 0);
+    set_blocking(fd_lcd_G, 0); // set to no blocking
+}
+
+
+int dismiss_lcd_comm(void)
+{
+    close(fd_lcd_G);
+}
+
+
+
+
+
+
+
+
+
+
 
 int main(void)
 {

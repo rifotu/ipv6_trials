@@ -223,6 +223,13 @@ void * unroll_wsn_data(void *ptr)
     return (void *)unrolled_p;
 }
 
+uint16_t cnvt_2_int(float val)
+{
+    val *= zeros_4;
+    return (uint16_t)val;
+}
+
+
 void * unroll_wsn_data_for_lcd(void *ptr)
 {
     uint8_t *unrolled_p = NULL;
@@ -245,24 +252,24 @@ void * unroll_wsn_data_for_lcd(void *ptr)
 
     for(int i=0; i < wsn->time_llh.number_of_nodes; i++){
 
-        offset = sizeof(struct time_llh_lcd_s) + i * sizeof(struct raw_node_data_lcd_sj);
+        offset = sizeof(struct time_llh_lcd_s) + i * sizeof(struct raw_node_data_lcd_s);
 
         raw_data = (struct raw_node_data_s *)get_node_data_at_index(wsn->llist_wsn, i)
 
-        raw_data_lcd.accel_x = raw_data->accel_x;
-        raw_data_lcd.accel_y = raw_data->accel_y;
-        raw_data_lcd.accel_z = raw_data->accel_z;
-        raw_data_lcd.temp    = raw_data->temp;
-        raw_data_pressure    = raw_data->
+        raw_data_lcd.accel_x  = raw_data->accel_x;
+        raw_data_lcd.accel_y  = raw_data->accel_y;
+        raw_data_lcd.accel_z  = raw_data->accel_z;
+        raw_data_lcd.temp     = raw_data->temp;
+        raw_data_lcd.pressure = raw_data->pressure;
+        raw_data_lcd.humidity = raw_data->humidity;
+        raw_data_lcd.addr     = raw_data->addr;
+    
         memcpy( unrolled_p + offset,
-                (void *)get_node_data_at_index(wsn->llist_wsn, i),
-                sizeof(struct raw_node_data_s));
-
+                (const void *) &raw_data_lcd,
+                sizeof(struct raw_node_data_lcd_s) );
     }
 
-
-
-    
+    return (void *)unrolled_p;
 }
 
 static void * get_wsn_info(void)
@@ -436,6 +443,7 @@ int main(int argc, char *argv[])
 
     initiate_connection_2_cloud();
     initiate_wsn();
+    initiate_lcd_comm();
 
     while(1)
     {
@@ -450,15 +458,20 @@ int main(int argc, char *argv[])
         record_a_set_of_wsn_data(wsn);
         
         // returns a buffer containing all data in flat format
-        wsn_flat = unroll_wsn_data(wsn);
+        wsn_flat_cloud = unroll_wsn_data(wsn);
         size = calc_size_for_unrolled_data(wsn);
-        send_data_2_cloud(wsn_flat, size);
-        send_data_2_lcd(wsn_flat, size);
+        send_data_2_cloud(wsn_flat_cloud, size);
+
+        wsn_flat_lcd = unroll_wsn_data_lcd(wsn);
+        size = calc_size_for_unrolled_lcd_data(wsn);
+        send_data_2_lcd(wsn_flat_lcd, size);
         
-        
+        free(wsn_flat_cloud);
+        free(wsn_flat_lcd);
         sleep(1);
     }
 
+    dismiss_lcd_comm();
     dismiss_wsn();
     kill_connection_2_cloud();
 
