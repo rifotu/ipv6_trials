@@ -21,6 +21,8 @@
 #include "gpsdclient.h"
 #include "revision.h"
 
+#include "gpxlogger.h"
+
 static char *progname;
 static struct fixsource_t source;
 
@@ -39,22 +41,18 @@ static double minmove = 0;	/* meters */
 static int debug;
 #endif /* CLIENTDEBUG_ENABLE */
 
-// Global Variables
-double old_lat_G = 0.0;
-double old_lon_G = 0.0;
+// Global Variables  RT
+static double old_lat_G = 0.0;
+static double old_lon_G = 0.0;
+static pthread_t threadID_G; 
 
-// Public function prototypes
-long long get_longitude(void);
-long long get_latitude(void);
-long long get_height(void);
-
-// Private function prototypes
+// Private function prototypes  RT
 static void debug_dump(struct gps_data_t *gpsdata);
 static void conditionally_log_fix(struct gps_data_t *gpsdata);
+static void quit_handler(int signum);
+static int init_gpsd(void);
+static void* get_gpsd(void *arg);
 
-static void quit_handler(int signum)
-int init_gpsd(void)
-void* get_gpsd(void *arg)
 
 static void debug_dump(struct gps_data_t *gpsdata)
 {
@@ -89,8 +87,6 @@ long long get_latitude(void)
     lat = old_lat_G * zeros_13;
     return (long long)lat;
 }
-
-
 
 static void conditionally_log_fix(struct gps_data_t *gpsdata)
 {
@@ -204,15 +200,21 @@ static void* get_gpsd(void *arg)
     exit(EXIT_SUCCESS);
 }
 
-pthread_t init_gps_stuff(void)
+void init_gps_stuff(void)
 {
-    pthread_t idThreads[1];
-
     init_gpsd();
-    pthread_create( &idThreads[0], NULL, get_gpsd, NULL);
+    pthread_create( &threadID_G, NULL, get_gpsd, NULL);
 
-    return idThreads[0];
+    return;
 }
+
+void dismiss_gps_stuff(void)
+{
+    //TODO
+    // stop the pthread
+    // stop the gpsd stuff
+
+    
 
 //int main(void)
 //{

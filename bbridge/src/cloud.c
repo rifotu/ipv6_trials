@@ -7,6 +7,8 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
+#include "cloud.h"
+
 // Definitions
 #define PORT_NO  51717
 #define SERVER_IP "178.79.179.186"
@@ -18,13 +20,9 @@ int sockfd_G = 0;
 // Private function prototypes
 void error(const char *msg);
 
-// Public function prototypes
-int initiate_connection_2_cloud(void);
-int kill_connection_2_cloud(void);
-int send_data_2_cloud(void *buf, int size);
 
 
-void error(const char *msg)
+static void error(const char *msg)
 {
     perror(msg);
     exit(0);

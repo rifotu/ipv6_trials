@@ -5,6 +5,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+
+#include "sensorNode.h"
+#include "gpxlogger.h"
+
+
 #define COMBINER_ID  87
 
 // Global Variables
@@ -101,6 +106,7 @@ static void * get_mem_for_raw_data(void);
 static size_t size_of_raw_data(void);
 static void *append_node_id(void *ptr, struct in6_addr sin6_addr);
 static void * get_data_from_sensor(char *ip_addr, int port);
+static uint16_t cnvt_2_int(float val)
 
 
 static void timestamp(struct wsn_data_s *wsn)
@@ -223,12 +229,11 @@ void * unroll_wsn_data(void *ptr)
     return (void *)unrolled_p;
 }
 
-uint16_t cnvt_2_int(float val)
+static uint16_t cnvt_2_int(float val)
 {
     val *= zeros_4;
     return (uint16_t)val;
 }
-
 
 void * unroll_wsn_data_for_lcd(void *ptr)
 {
@@ -417,81 +422,3 @@ static void * get_data_from_sensor(char *ip_addr, int port)
 
     return raw_buf;
 }
-                                       
-
-
-
-///////////////////////////////////////////////////////////////////////
-
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <arpa/inet.h> 
-
-int main(int argc, char *argv[])
-{
-    void *wsn = NULL;
-    void *wns_flat = NULL;
-    int size = 0;
-    pthread_t idThreads[1];
-
-
-    init_gpsd();
-    initiate_connection_2_cloud();
-    initiate_wsn();
-    initiate_lcd_comm();
-
-    while(1)
-    {
-
-        // returns a pointer of struct wsn_data_s
-        wsn = prep_a_set_of_wsn_data();
-
-        // record a certain number of wsn data set
-        // in case you may need it in the future
-        // Don't worry about freeing stuff, as it
-        // will be handled later in dismiss_wsn function
-        record_a_set_of_wsn_data(wsn);
-        
-        // returns a buffer containing all data in flat format
-        wsn_flat_cloud = unroll_wsn_data(wsn);
-        size = calc_size_for_unrolled_data(wsn);
-        send_data_2_cloud(wsn_flat_cloud, size);
-
-        wsn_flat_lcd = unroll_wsn_data_lcd(wsn);
-        size = calc_size_for_unrolled_lcd_data(wsn);
-        send_data_2_lcd(wsn_flat_lcd, size);
-        
-        free(wsn_flat_cloud);
-        free(wsn_flat_lcd);
-        sleep(1);
-    }
-
-    dismiss_lcd_comm();
-    dismiss_wsn();
-    kill_connection_2_cloud();
-
-    return 0;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
