@@ -12,11 +12,12 @@
 int main(int argc, char **argv)
 {
     void *wsn = NULL;
-    void *wns_flat = NULL;
+    void *wsn_flat_cloud = NULL;
+    void *wsn_flat_lcd = NULL;
     int size = 0;
 
 
-    init_gpsd();
+    init_gps_stuff();
     initiate_connection_2_cloud();
     initiate_wsn();
     initiate_lcd_comm();
@@ -36,11 +37,11 @@ int main(int argc, char **argv)
         // returns a buffer containing all data in flat format
         wsn_flat_cloud = unroll_wsn_data(wsn);
         size = calc_size_for_unrolled_data(wsn);
-        send_data_2_cloud(wsn_flat_cloud, size);
+        send_data_2_cloud((uint8_t *)wsn_flat_cloud, size);
 
         wsn_flat_lcd = unroll_wsn_data_lcd(wsn);
         size = calc_size_for_unrolled_lcd_data(wsn);
-        send_data_2_lcd(wsn_flat_lcd, size);
+        send_data_2_lcd((uint8_t *)wsn_flat_lcd, size);
         
         free(wsn_flat_cloud);
         free(wsn_flat_lcd);

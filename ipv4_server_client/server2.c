@@ -134,21 +134,6 @@ int prep_raw_data_file(struct wsn_data_t *wsn)
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-    
-    
-
-
-
 int init_stuff(void)
 {
     // initialize everything
@@ -181,12 +166,6 @@ static void free_ll_wsn_history(void *data)
     free(wsn_dp);
     return;
 }
-
-
-
-
-
-
 
 void error(const char *msg)
 {

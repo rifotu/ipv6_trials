@@ -31,15 +31,14 @@ static struct fixsource_t source;
  * Transport-layer-independent functions
  *
  **************************************************************************/
+const double zeros_13 = 10000000000.0;
+const double zeros_4 = 10000.0;
 
 static struct gps_data_t gpsdata;
 static FILE *logfile;
 static bool intrack = false;
 static time_t timeout = 5;	/* seconds */
 static double minmove = 0;	/* meters */
-#ifdef CLIENTDEBUG_ENABLE
-static int debug;
-#endif /* CLIENTDEBUG_ENABLE */
 
 // Global Variables  RT
 static double old_lat_G = 0.0;
@@ -175,6 +174,8 @@ static int init_gpsd(void)
     (void)signal(SIGTERM, quit_handler);
     (void)signal(SIGQUIT, quit_handler);
     (void)signal(SIGINT, quit_handler);
+
+    return 0;
 }
 
 static void* get_gpsd(void *arg)
@@ -203,9 +204,7 @@ static void* get_gpsd(void *arg)
 void init_gps_stuff(void)
 {
     init_gpsd();
-    pthread_create( &threadID_G, NULL, get_gpsd, NULL);
-
-    return;
+    pthread_create(&threadID_G, NULL, get_gpsd, NULL);
 }
 
 void dismiss_gps_stuff(void)
@@ -213,6 +212,7 @@ void dismiss_gps_stuff(void)
     //TODO
     // stop the pthread
     // stop the gpsd stuff
+}
 
     
 

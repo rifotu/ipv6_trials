@@ -1,19 +1,22 @@
 #include <stdint.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
 
 #include "sensorNode.h"
 #include "gpxlogger.h"
+#include "list.h"
 
 
 #define COMBINER_ID  87
 
-// Global Variables
-struct config_s *wsn_config_G;
 
 // Constants
 const char ipv6_addresses_G[2][25] = {
@@ -21,7 +24,10 @@ const char ipv6_addresses_G[2][25] = {
     {"aaaa::212:4b00:43c:4be5"}
 };
 
-const int PORT_NUMBER = 3000;
+static const int PORT_NUMBER = 3000;
+static const float zeros_13 = 10000000000.0;
+static const float zeros_4 = 10000.0;
+
 
 // Structure definitions
 typedef struct raw_node_data_lcd_s{
@@ -42,11 +48,6 @@ typedef struct time_llh_lcd_s{
     long long longitude;
 }time_llh_lcd_t;
 
-typedef struct wsn_data_s{
-    struct time_llh_s time_llh;
-    list* llist_wsn;         // holds raw data for each sensor in the network 
-}wsn_data_t;
-
 typedef struct raw_node_data_s{
     int16_t accel_x;
     int16_t accel_y;
@@ -66,6 +67,11 @@ typedef struct time_llh_s{
     long long longitude;
     long long height;
 }time_llh_t;
+
+typedef struct wsn_data_s{
+    struct time_llh_s time_llh;
+    list* llist_wsn;         // holds raw data for each sensor in the network 
+}wsn_data_t;
 
 // holds information regarding 
 // the number of nodes and their
@@ -94,9 +100,11 @@ typedef struct wsn_config_s{
     //TODO:  Determine further parameters
 }wsn_config_t;
 
+// Global Variables
+struct wsn_config_s *wsn_config_G;
 
 // Private Function Prototypes
-static void timestamp(void *p);
+static void timestamp(struct wsn_data_s *wsn);
 static int geolocate(struct wsn_data_s *wsn);
 static void * get_wsn_info(void);
 static void free_ll_node_prop(void *data);
@@ -106,7 +114,7 @@ static void * get_mem_for_raw_data(void);
 static size_t size_of_raw_data(void);
 static void *append_node_id(void *ptr, struct in6_addr sin6_addr);
 static void * get_data_from_sensor(char *ip_addr, int port);
-static uint16_t cnvt_2_int(float val)
+//static uint16_t cnvt_2_int(float val);
 
 
 static void timestamp(struct wsn_data_s *wsn)
@@ -134,6 +142,7 @@ static int geolocate(struct wsn_data_s *wsn)
     wsn->time_llh.latitude = get_latitude();
     wsn->time_llh.longitude = get_longitude();
     wsn->time_llh.height = get_height();
+    return 0;
 }
 
 // Currently this function will not be used as
@@ -147,7 +156,7 @@ void record_a_set_of_wsn_data(void *ptr)
     
     // check whether we have passed the recording limit
     if(20 <= size(wsn_config_G->ll_wsn_data_history) ){
-        remove_back(wsn_config_G->llist, free_ll_wsn_history);
+        remove_back(wsn_config_G->ll_wsn_data_history, free_ll_wsn_history);
     }
 
     return;
@@ -165,7 +174,7 @@ void * prep_a_set_of_wsn_data(void)
     // Go into a for loop {
     // Timestamp & Geolocate data set
 
-    wsn = (struct wsn_data_s *)malloc(sizeof(struct wsn_data_s *));
+    wsn = (struct wsn_data_s *)malloc(sizeof(struct wsn_data_s));
     wsn->llist_wsn = create_list();
 
     for(int i=0; i < wsn_config_G->wsn_info->number_of_nodes; i++){
@@ -182,6 +191,7 @@ void * prep_a_set_of_wsn_data(void)
 
 int calc_size_for_unrolled_data(void *ptr)
 {
+    int msize = 0;
     if(NULL == ptr){ return -1; }
 
     struct wsn_data_s *wsn = ptr;
@@ -194,12 +204,15 @@ int calc_size_for_unrolled_data(void *ptr)
     
 int calc_size_for_unrolled_lcd_data(void *ptr)
 {
+    int msize = 0;
     if(NULL == ptr){return -1; }
 
     struct wsn_data_s *wsn = ptr;
 
     msize = sizeof(struct time_llh_lcd_s) +
             sizeof(raw_node_data_lcd_t) * wsn->time_llh.number_of_nodes;
+
+    return msize;
 }
     
 
@@ -229,13 +242,13 @@ void * unroll_wsn_data(void *ptr)
     return (void *)unrolled_p;
 }
 
-static uint16_t cnvt_2_int(float val)
-{
-    val *= zeros_4;
-    return (uint16_t)val;
-}
+//static uint16_t cnvt_2_int(float val)
+//{
+//    val *= zeros_4;
+//    return (uint16_t)val;
+//}
 
-void * unroll_wsn_data_for_lcd(void *ptr)
+void * unroll_wsn_data_lcd(void *ptr)
 {
     uint8_t *unrolled_p = NULL;
     struct wsn_data_s *wsn = ptr;
@@ -259,7 +272,7 @@ void * unroll_wsn_data_for_lcd(void *ptr)
 
         offset = sizeof(struct time_llh_lcd_s) + i * sizeof(struct raw_node_data_lcd_s);
 
-        raw_data = (struct raw_node_data_s *)get_node_data_at_index(wsn->llist_wsn, i)
+        raw_data = (struct raw_node_data_s *)get_node_data_at_index(wsn->llist_wsn, i);
 
         raw_data_lcd.accel_x  = raw_data->accel_x;
         raw_data_lcd.accel_y  = raw_data->accel_y;
@@ -267,7 +280,9 @@ void * unroll_wsn_data_for_lcd(void *ptr)
         raw_data_lcd.temp     = raw_data->temp;
         raw_data_lcd.pressure = raw_data->pressure;
         raw_data_lcd.humidity = raw_data->humidity;
-        raw_data_lcd.addr     = raw_data->addr;
+        memcpy(raw_data_lcd.addr, 
+               raw_data->addr, 
+               sizeof(unsigned char)*16  );
     
         memcpy( unrolled_p + offset,
                 (const void *) &raw_data_lcd,
@@ -286,14 +301,14 @@ static void * get_wsn_info(void)
     // Get the corresponding addresses
 
 
-    wsn_info_p = malloc(sizeof(wsn_info_s));
+    wsn_info_p = (struct wsn_info_s *)malloc(sizeof(struct wsn_info_s));
     wsn_info_p->number_of_nodes = 2;
     wsn_info_p->ll_node_prop = create_list();
 
     // Currently node address are hardcoded
     for(int i=0; i < wsn_info_p->number_of_nodes; i++){
         node_prop_p = malloc(sizeof(struct node_prop_s)); 
-        memcpy(node_prop_p->ipv6_address, ipv6_addresses[i], sizeof(char)*25);
+        memcpy(node_prop_p->ipv6_address, ipv6_addresses_G[i], sizeof(char)*25);
         node_prop_p->type = 2; // 2 is a random choice
         node_prop_p->port = PORT_NUMBER;
         push_front( wsn_info_p->ll_node_prop, node_prop_p);
@@ -307,9 +322,9 @@ static void * get_wsn_info(void)
 int initiate_wsn(void)
 {
     //TODO: have the tunslip interface up
-    wsn_config_G = malloc(sizeof(struct config_s));
+    wsn_config_G = malloc(sizeof(struct wsn_config_s));
     wsn_config_G->readout_period = 5;  // in terms of minutes
-    wsn_config_G->wsn_info = (wns_info_t *)get_wsn_info();
+    wsn_config_G->wsn_info = (wsn_info_t *)get_wsn_info();
     wsn_config_G->ll_wsn_data_history = create_list();
     return 0;
 
@@ -352,7 +367,7 @@ static void * get_mem_for_raw_data(void)
     struct raw_node_data_s* raw_buf = NULL;
 
     raw_buf = (struct raw_node_data_s *)malloc(sizeof(struct raw_node_data_s));
-    memset(0, raw_buf);
+    memset(raw_buf, 0, sizeof(struct raw_node_data_s));
 
     return raw_buf;
 }
@@ -396,7 +411,7 @@ static void * get_data_from_sensor(char *ip_addr, int port)
     // sets the first n bytes of the area starting at s to zero
     bzero( &serv_addr, sizeof(serv_addr));
     serv_addr.sin6_family = AF_INET6;
-    serv_addr.sin6_port = htons(porEngineerDogBlogt);
+    serv_addr.sin6_port = htons(port);
 
     // convert IPv4 and IPv6 addresses from text to binary form 
     if( 0 == inet_pton(AF_INET6, ip_addr, &serv_addr.sin6_addr)){
@@ -404,18 +419,19 @@ static void * get_data_from_sensor(char *ip_addr, int port)
     }
 
     if( -1 == sendto(sockfd, dummy_msg, strlen(dummy_msg), 0, (struct sockaddr *) &serv_addr, slen) ){
-        err("sendto() function");
+        printf("sendto() function");
     }
     
     raw_buf = get_mem_for_raw_data(); //TODO: check for null pointer return
 
     if( 0 >= ( resp_buf_len = recvfrom(sockfd, raw_buf, size_of_raw_data(), 0,
                                        (struct sockaddr *) &resp_addr, &resp_addr_size   ))){
-        err("recvfrom()");
+        printf("recvfrom()");
     }
 
 
-    append_node_id(raw_buf, &serv_addr.sin6_addr);
+    //append_node_id(raw_buf, &serv_addr.sin6_addr);
+    append_node_id(raw_buf, serv_addr.sin6_addr);
 
     //print_sensor_payload();
     close(sockfd);

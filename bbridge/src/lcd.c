@@ -14,9 +14,9 @@
 static int fd_lcd_G = 0;
 
 // Constant values
-const char *lcd_port = "/dev/ttyO1";
-const float zeros_13 = 10000000000.0;
-const float zeros_4 = 10000.0;
+static const char *lcd_port = "/dev/ttyO1";
+static const float zeros_13 = 10000000000.0;
+static const float zeros_4 = 10000.0;
 
 #pragma pack(1)
 // Structure definitions
@@ -109,21 +109,23 @@ static void set_blocking(int fd, int should_block)
 int send_data_2_lcd(uint8_t *buf, int size)
 {
     int n = 0;
-    n = write(fd, buf, size);
+    n = write(fd_lcd_G, buf, size);
     return n;
 }
 
 
-int initialize_lcd_comm(void)
+int initiate_lcd_comm(void)
 {
 
     fd_lcd_G = open( lcd_port, O_RDWR | O_NOCTTY | O_SYNC);
     set_interface_attribs(fd_lcd_G, B115200, 0);
     set_blocking(fd_lcd_G, 0); // set to no blocking
+    return 0;
 }
 
 
 int dismiss_lcd_comm(void)
 {
     close(fd_lcd_G);
+    return 0;
 }
