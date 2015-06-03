@@ -1,12 +1,10 @@
 CC=gcc
 CFLAGS= -g -Wall -std=gnu99
-LFLAGS= -pthread -lrt -lgps
+LFLAGS= -lrt 
 SRC=./src
-INCLUDE = -I./inc -I/opt/gpsd/
-#OBJ = $(SRC)/cloud.o $(SRC)/src/list.o $(SRC)/src/gpxlogger.o $(SRC)/src/lcd.o ./src/sensorNode.o ./src/coordinator.o
-OBJ  = $(SRC)/cloud.o $(SRC)/list.o $(SRC)/gpxlogger.o 
-OBJ += $(SRC)/lcd.o $(SRC)/sensorNode.o $(SRC)/coordinator.o
-TARGET = manage
+INCLUDE = -I./inc 
+OBJ  = $(SRC)/list.o $(SRC)/server2.o 
+TARGET = cloud 
 
 all: $(TARGET)
 
