@@ -1,10 +1,10 @@
 CC=gcc
 CFLAGS= -g -Wall -std=gnu99
-LFLAGS= -lrt -lpthread
-SRC=./src
-INCLUDE = -I./inc 
-OBJ  = $(SRC)/list.o $(SRC)/server2.o 
-TARGET = cloud 
+LFLAGS= -lrt 
+SRC=.
+INCLUDE = -I../inc 
+OBJ  = $(SRC)/list.o $(SRC)/client2.o 
+TARGET = test-client
 
 all: $(TARGET)
 

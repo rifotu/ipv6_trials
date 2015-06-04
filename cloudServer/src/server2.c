@@ -88,9 +88,9 @@ struct wsn_data_s * roll_wsn_data(void *ptr, int size)
 
     wsn->llist_wsn = create_list();
     for(int i=0; i < wsn->time_llh.number_of_nodes; i++){
-        raw = (struct raw_node_data_s *)malloc(sizeof(struct raw_node_data_s *));
+        raw = (struct raw_node_data_s *)malloc(sizeof(struct raw_node_data_s));
         memcpy(raw, ptr + time_llh_size + i * raw_data_size, raw_data_size);
-        push_front(wsn->llist_wsn, raw);
+        push_front(wsn->llist_wsn, (void *)raw);
     }
 
     return wsn;
@@ -164,32 +164,44 @@ int prep_raw_data_file(struct wsn_data_s *wsn)
     //float zeros_13 = 10000000000000.0;
     long long lng = wsn->time_llh.longitude;
     long long ltd = wsn->time_llh.latitude;
-    double lng_f = lng / 10000000.;
-    double ltd_f = ltd / 10000000.;
+    double lng_f = lng / 1000000000.;
+    double ltd_f = ltd / 1000000000.;
     struct tm tm = wsn->time_llh.timestamp;
     struct raw_node_data_s *raw = NULL;
     
-    fprintf(config_G.fp_raw,"INSERT INTO raw (the_geom, latitude, longitude, ax, ay, \
-                                              az, temp, pres, humidity, luminosity,  \
-                                              combiner, time) VALUES\n");
+    config_G.fp_raw = fopen( rawDataFile, "w");
+    fprintf(config_G.fp_raw,"INSERT INTO raw (the_geom, latitude, longitude, ax, ay, az, temp, pres, humidity, luminosity, combiner, time) VALUES\n");
+    printf("INSERT INTO raw (the_geom, latitude, longitude, ax, ay, az, temp, pres, humidity, luminosity, combiner, time) VALUES\n");
     for(int i=0; i < size(wsn->llist_wsn) ; i++){
 
         raw = get_node_data_at_index(wsn->llist_wsn, i);
 
-        fprintf(config_G.fp_raw,"ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"Point\",\"coordinates\":[%.8f,%8f]}'),4326),", ltd_f, lng_f );
+        fprintf(config_G.fp_raw,"(ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"Point\",\"coordinates\":[%.8f,%8f]}'),4326),", ltd_f, lng_f );
+        printf("(ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"Point\",\"coordinates\":[%.8f,%8f]}'),4326),", ltd_f, lng_f );
         //fprintf(config_G.fp_raw,"%.8f,%.8f, %+6d, %+6d, %+6d, %+3d, %+6ld, %.2f, %d, %d:%d:%d)",          
-        fprintf(config_G.fp_raw,"%lld,%lld, %+6d, %+6d, %+6d, %+3d, %zu, %.2f, %.2f, %d, %d:%d:%d)",     \
+        fprintf(config_G.fp_raw,"%lld,%lld, %+6d, %+6d, %+6d, %+3d, %zu, %.2f, %.2f, %d, '%d:%d:%d')",     \
                                 ltd, lng, raw->accel_x, raw->accel_y, raw->accel_z, raw->temp,             \
                                 raw->pressure, raw->humidity, raw->luminosity, wsn->time_llh.combinerID,   \
                                 tm.tm_hour, tm.tm_min, tm.tm_sec);
 
-        if(i == size(wsn->llist_wsn) - 1){
-            fprintf(config_G.fp_raw,",\n");
+        printf("%lld,%lld, %+6d, %+6d, %+6d, %+3d, %zu, %.2f, %.2f, %d, %d:%d:%d)",     \
+                                ltd, lng, raw->accel_x, raw->accel_y, raw->accel_z, raw->temp,             \
+                                raw->pressure, raw->humidity, raw->luminosity, wsn->time_llh.combinerID,   \
+                                tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+        if(i == (size(wsn->llist_wsn) - 1)){
+            fprintf(config_G.fp_raw,"\n;\n");
+            printf("\n;\n");
         }else{
-            fprintf(config_G.fp_raw,"\n");
+            fprintf(config_G.fp_raw,",\n");
+            printf(",\n");
         }
-        fprintf(config_G.fp_raw,";");
+
+        fflush(config_G.fp_raw);
+        usleep(100);
     }
+    fclose(config_G.fp_raw);
+
 
     return 0;
 }
@@ -197,8 +209,8 @@ int prep_raw_data_file(struct wsn_data_s *wsn)
 int init_stuff(void)
 {
     // initialize everything
-    config_G.fp_raw = fopen( rawDataFile, "a");
-    config_G.fp_geo = fopen( geoLocationFile, "a");
+    //config_G.fp_raw = fopen( rawDataFile, "w");
+    config_G.fp_geo = fopen( geoLocationFile, "w");
     config_G.llist_dataset = create_list();
     return 0;
 }
@@ -206,7 +218,7 @@ int init_stuff(void)
 int dismiss_stuff(void)
 {
     // deinitialize everything
-    fclose(config_G.fp_raw);
+    //fclose(config_G.fp_raw);
     fclose(config_G.fp_geo);
     empty_list(config_G.llist_dataset, free_ll_wsn_history);
 
@@ -243,16 +255,19 @@ int main(int argc, char *argv[])
      char buffer[maxPayloadSize];
      struct sockaddr_in serv_addr, cli_addr;
      int n;
-     if (argc < 2) {
-         fprintf(stderr,"ERROR, no port provided\n");
-         exit(1);
-     }
+     //if (argc < 2) {
+     //    fprintf(stderr,"ERROR, no port provided\n");
+     //    exit(1);
+     //}
+
+     init_stuff();
      sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
      if (sockfd < 0){
         error("ERROR opening socket");
      }
-     portno = atoi(argv[1]);
+     //portno = atoi(argv[1]);
+     portno = PORT_NO;
 
      bzero((char *) &serv_addr, sizeof(serv_addr));
      serv_addr.sin_family = AF_INET;
@@ -284,13 +299,14 @@ int main(int argc, char *argv[])
 
              if( n > 0){ // we've received data
                  printf("Message size: %d\n",n);
-                 n = write(newsockfd,"I got your message",18);
-                 if (n < 0) { error("ERROR writing to socket"); }
+                 //n = write(newsockfd,"I got your message",18);
+                 //if (n < 0) { error("ERROR writing to socket"); }
 
                  wsn = roll_wsn_data( (void *)buffer, n);
-                 print_sensor_payload(wsn);
+                 //print_sensor_payload(wsn);
                  add_rolled_wsn_data_to_ll(wsn);
                  prep_raw_data_file(wsn);
+                 system("./insert.sh");
                  free(wsn);
                  wsn = NULL;
 
@@ -310,5 +326,6 @@ int main(int argc, char *argv[])
      }
 
      close(sockfd);
+     dismiss_stuff();
      return 0; 
 }

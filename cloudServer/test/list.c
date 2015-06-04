@@ -37,7 +37,7 @@ list* create_list(void)
  * return a pointer to the created node  */
 static node* create_node(void* data)
 {
-  node *n = (struct lnode *)malloc(sizeof(struct lnode));
+  node *n = malloc(sizeof(node));
   n->data = data;
   n->prev = NULL;
   n->next = NULL;
