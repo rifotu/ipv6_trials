@@ -12,8 +12,8 @@
 
 // Definitions
 #define PORT_NO  51717
-#define SERVER_IP "178.79.179.186"
-//#define SERVER_IP "127.0.0.1"
+//#define SERVER_IP "178.79.179.186"
+#define SERVER_IP "127.0.0.1"
 // Global variables
 int sockfd_G = 0;
 
@@ -28,7 +28,7 @@ typedef struct raw_node_data_s{
     uint32_t pressure;
     float humidity;
     float luminosity;
-    unsigned char addr[25]; /* IPv6 address */
+    unsigned char addr[16]; /* IPv6 address */
 }raw_node_data_t;
 
 typedef struct time_llh_s{
@@ -287,6 +287,7 @@ int main(int argc, char *argv[])
         //send_data_2_cloud(buffer, sizeof(buffer));
         send_data_2_cloud(buffer, len);
         sleep(5);
+
     }
 
     kill_connection_2_cloud();

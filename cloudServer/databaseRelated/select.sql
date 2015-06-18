@@ -1,1 +1,1 @@
-SELECT ph FROM map2;
+SELECT humidity FROM raw;

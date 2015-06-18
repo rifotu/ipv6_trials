@@ -39,7 +39,7 @@ typedef struct raw_node_data_s{
     uint32_t pressure;
     float humidity;
     float luminosity;
-    unsigned char addr[16]; /* IPv6 address */
+    char addr[25]; /* IPv6 address */
 }raw_node_data_t;
 
 typedef struct time_llh_s{
@@ -113,7 +113,9 @@ int get_ll_size(void)
     return size(config_G.llist_dataset);
 }
 
-
+// TODO: used time_t instead of struct tm while sending messages between
+// server and client. sizeof(struct tm) differs between beagle bone black and
+// 64 bit linode server
 static void print_sensor_payload(struct wsn_data_s * wsn)
 {
     struct raw_node_data_s *raw = NULL;
@@ -164,8 +166,8 @@ int prep_raw_data_file(struct wsn_data_s *wsn)
     //float zeros_13 = 10000000000000.0;
     long long lng = wsn->time_llh.longitude;
     long long ltd = wsn->time_llh.latitude;
-    double lng_f = lng / 1000000000.;
-    double ltd_f = ltd / 1000000000.;
+    double lng_f = lng / 10000000000.;
+    double ltd_f = ltd / 10000000000.;
     struct tm tm = wsn->time_llh.timestamp;
     struct raw_node_data_s *raw = NULL;
     
@@ -176,8 +178,8 @@ int prep_raw_data_file(struct wsn_data_s *wsn)
 
         raw = get_node_data_at_index(wsn->llist_wsn, i);
 
-        fprintf(config_G.fp_raw,"(ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"Point\",\"coordinates\":[%.8f,%8f]}'),4326),", ltd_f, lng_f );
-        printf("(ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"Point\",\"coordinates\":[%.8f,%8f]}'),4326),", ltd_f, lng_f );
+        fprintf(config_G.fp_raw,"(ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"Point\",\"coordinates\":[%.8f,%8f]}'),4326),", lng_f, ltd_f );
+        printf("(ST_SetSRID(ST_GeomFromGeoJSON('{\"type\":\"Point\",\"coordinates\":[%.8f,%8f]}'),4326),", lng_f, ltd_f );
         //fprintf(config_G.fp_raw,"%.8f,%.8f, %+6d, %+6d, %+6d, %+3d, %+6ld, %.2f, %d, %d:%d:%d)",          
         fprintf(config_G.fp_raw,"%lld,%lld, %+6d, %+6d, %+6d, %+3d, %zu, %.2f, %.2f, %d, '%d:%d:%d')",     \
                                 ltd, lng, raw->accel_x, raw->accel_y, raw->accel_z, raw->temp,             \
@@ -260,6 +262,27 @@ int main(int argc, char *argv[])
      //    exit(1);
      //}
 
+     struct test_s{
+        int16_t x;
+        int16_t y;
+        int64_t z;
+        long long j;
+        long long k;
+        float l;
+        float m;
+     };
+
+     struct test_s *test = NULL;
+
+     printf("sizeof long long %d\n", sizeof(long long));
+     printf("sizeof float %d\n", sizeof(float));
+     printf("sizeof double %d\n", sizeof(double));
+     printf("sizeof long %d\n", sizeof(long));
+     printf("sizeof int %d\n", sizeof(int));
+     printf("sizeof raw_node : %d\n", sizeof(struct raw_node_data_s));
+     printf("sizeof time_llh : %d\n", sizeof(struct time_llh_s));
+     printf("sizeof struct tm: %d\n", sizeof(struct tm));
+
      init_stuff();
      sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -301,9 +324,20 @@ int main(int argc, char *argv[])
                  printf("Message size: %d\n",n);
                  //n = write(newsockfd,"I got your message",18);
                  //if (n < 0) { error("ERROR writing to socket"); }
+                 
+                 test = (struct test_s *)buffer;
+
+                 //printf("x: %d\n", test->x);
+                 //printf("y: %d\n", test->y);
+                 //printf("z: %zu\n", test->z);
+                 //printf("j: %llu\n", test->j);
+                 //printf("k: %llu\n", test->k);
+                 //printf("l: %f\n", test->l);
+                 //printf("m: %f\n", test->m);
+                 printf("****************\n");
 
                  wsn = roll_wsn_data( (void *)buffer, n);
-                 //print_sensor_payload(wsn);
+                 print_sensor_payload(wsn);
                  add_rolled_wsn_data_to_ll(wsn);
                  prep_raw_data_file(wsn);
                  system("./insert.sh");
