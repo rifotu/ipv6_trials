@@ -16,7 +16,7 @@ int main(int argc, char **argv)
     void *wsn_flat_lcd = NULL;
     int size = 0;
 
-
+    sleep(5);
     init_gps_stuff();
     initiate_connection_2_cloud();
     initiate_wsn();
@@ -25,7 +25,10 @@ int main(int argc, char **argv)
     while(1)
     {
 
+
         // returns a pointer of struct wsn_data_s
+        //printf("calling prep a set of wsn data\n");
+        printf("................\n");
         wsn = prep_a_set_of_wsn_data();
 
         // record a certain number of wsn data set
@@ -37,7 +40,11 @@ int main(int argc, char **argv)
         // returns a buffer containing all data in flat format
         wsn_flat_cloud = unroll_wsn_data(wsn);
         size = calc_size_for_unrolled_data(wsn);
+        print_cloud_data(wsn_flat_cloud);
         send_data_2_cloud((uint8_t *)wsn_flat_cloud, size);
+        //sendme.j = get_latitude();
+        //sendme.k = get_longitude();
+        //send_data_2_cloud((uint8_t *)&sendme, sizeof(struct test_s));
 
         wsn_flat_lcd = unroll_wsn_data_lcd(wsn);
         size = calc_size_for_unrolled_lcd_data(wsn);
@@ -45,7 +52,7 @@ int main(int argc, char **argv)
         
         free(wsn_flat_cloud);
         free(wsn_flat_lcd);
-        sleep(1);
+        sleep(10);
     }
 
     dismiss_lcd_comm();

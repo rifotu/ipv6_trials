@@ -10,5 +10,7 @@ void * unroll_wsn_data(void *ptr);
 void * unroll_wsn_data_lcd(void *ptr);
 int initiate_wsn(void);
 int dismiss_wsn(void);
+void print_cloud_data(uint8_t *buf);
+
 
 #endif

@@ -116,7 +116,7 @@ int send_data_2_lcd(uint8_t *buf, int size)
 
 int initiate_lcd_comm(void)
 {
-
+    printf("initiating lcd stuff\n");
     fd_lcd_G = open( lcd_port, O_RDWR | O_NOCTTY | O_SYNC);
     set_interface_attribs(fd_lcd_G, B115200, 0);
     set_blocking(fd_lcd_G, 0); // set to no blocking

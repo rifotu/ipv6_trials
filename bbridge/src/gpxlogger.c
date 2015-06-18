@@ -76,6 +76,7 @@ long long get_longitude(void)
     double lon = 0.0;
 
     lon = old_lon_G * zeros_13;
+    //printf("lon: %llu\n", (long long)lon);
     return (long long)lon;
 }
 
@@ -83,7 +84,9 @@ long long get_latitude(void)
 {
     double lat = 0.0;
 
+    //TODO  mutex these against the thread
     lat = old_lat_G * zeros_13;
+    //printf("lat: %llu\n", (long long)lat);
     return (long long)lat;
 }
 
@@ -93,12 +96,13 @@ static void conditionally_log_fix(struct gps_data_t *gpsdata)
     //static double old_lat_G, old_lon_G;
     static bool first = true;
 
-    debug_dump(gpsdata);
+    //debug_dump(gpsdata);
+	//old_lat_G = gpsdata->fix.latitude;
+	//old_lon_G = gpsdata->fix.longitude;
 
     int_time = gpsdata->fix.time;
-    if ((int_time == old_int_time) || gpsdata->fix.mode < MODE_2D)
-        
-	return;
+    //if ((int_time == old_int_time) || gpsdata->fix.mode < MODE_2D)
+	//return;
 
     /* may not be worth logging if we've moved only a very short distance */
     if (minmove>0 && !first && earth_distance(
@@ -127,7 +131,7 @@ static void conditionally_log_fix(struct gps_data_t *gpsdata)
     }
 
     old_int_time = int_time;
-    if (minmove > 0) {
+    if (minmove >= 0) {
 	old_lat_G = gpsdata->fix.latitude;
 	old_lon_G = gpsdata->fix.longitude;
     }

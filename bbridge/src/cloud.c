@@ -30,12 +30,14 @@ static void error(const char *msg)
     exit(0);
 }
 
+
 int initiate_connection_2_cloud(void)
 {
     int portno;
     struct sockaddr_in serv_addr;
     struct hostent *server;
     
+    printf("connection to cloud\n");
     portno = PORT_NO;
     sockfd_G = socket(AF_INET, SOCK_STREAM, 0);
     if(sockfd_G < 0){
@@ -51,15 +53,23 @@ int initiate_connection_2_cloud(void)
     bzero( (char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     memcpy( (char *) &serv_addr.sin_addr.s_addr,
-            (char *) &server->h_addr,
+            (char *) server->h_addr,
             server->h_length);
 
     serv_addr.sin_port = htons(portno);
+     printf("port no: %d\n", portno);
+    fprintf(stderr, "will try to connect now\n");
 
-    if( connect(sockfd_G, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0){
-        error("ERROR connecting");
-        return -1;
+    while(1){
+
+        if( connect(sockfd_G, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) >= 0){
+            fprintf(stdout, "connected to cloud\n");
+            break;
+        }
+        fprintf(stderr, "ERROR connecting\n");
+        sleep(5);
     }
+    printf("connection to cloud returns\n");
     return 0;
 }
 
